@@ -6,6 +6,7 @@ import { useConfigStore } from "@/stores/config";
 import { useDevicesStore } from "@/stores/devices";
 import { useDeviceNamesStore } from "@/stores/deviceNames";
 import FanCurveEditor from "@/components/fans/FanCurveEditor.vue";
+import CurvePointsEditor from "@/components/fans/CurvePointsEditor.vue";
 import FanGroupCard from "@/components/fans/FanGroupCard.vue";
 import SensorSelect from "@/components/common/SensorSelect.vue";
 import type { SensorSource, DeviceInfo } from "@/types";
@@ -260,10 +261,16 @@ function onHysteresisPwm(percent: number | null) {
       </div>
 
       <div v-if="current" class="curve-body">
-        <FanCurveEditor
-          :model-value="current.curve"
-          @update:model-value="onCurveChange"
-        />
+        <div class="curve-main">
+          <FanCurveEditor
+            :model-value="current.curve"
+            @update:model-value="onCurveChange"
+          />
+          <CurvePointsEditor
+            :model-value="current.curve"
+            @update:model-value="onCurveChange"
+          />
+        </div>
         <div class="curve-side">
           <div class="field">
             <label class="muted">{{ t("fans.page.name") }}</label>
@@ -406,13 +413,16 @@ function onHysteresisPwm(percent: number | null) {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
-  max-width: 200px;
+  height: 34px;
+  box-sizing: border-box;
+  background: transparent;
+  border: 1px solid var(--md-outline);
+  color: var(--md-on-surface-variant);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 220px;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .curve-tab-name {
@@ -422,13 +432,13 @@ function onHysteresisPwm(percent: number | null) {
   cursor: pointer;
 }
 .curve-tab:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  color: var(--md-on-surface);
 }
 .curve-tab.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--md-secondary-container);
+  border-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
 }
 .curve-tab-del {
   display: inline-flex;
@@ -444,7 +454,7 @@ function onHysteresisPwm(percent: number | null) {
 }
 .curve-tab-del:hover {
   opacity: 1;
-  background: rgba(248, 113, 113, 0.18);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
   color: var(--danger);
 }
 .curve-tab.add {
@@ -452,14 +462,24 @@ function onHysteresisPwm(percent: number | null) {
   align-items: center;
   gap: var(--space-1);
   border-style: dashed;
-  padding: var(--space-1) var(--space-3);
+  padding: 0 var(--space-4);
+  color: var(--md-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
 }
 .curve-body {
   display: grid;
-  grid-template-columns: auto minmax(220px, 1fr);
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: var(--space-6);
   align-items: start;
+}
+.curve-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
 }
 .curve-side {
   display: flex;
@@ -485,7 +505,7 @@ function onHysteresisPwm(percent: number | null) {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
-@media (max-width: 860px) {
+@media (max-width: 1080px) {
   .curve-body {
     grid-template-columns: 1fr;
   }
@@ -498,7 +518,7 @@ function onHysteresisPwm(percent: number | null) {
 .groups {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: var(--space-3);
 }
 .settings-row {
   display: flex;

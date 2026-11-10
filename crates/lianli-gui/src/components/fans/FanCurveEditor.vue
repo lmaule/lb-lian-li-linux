@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useTranslate } from "@/i18n";
+import { CURVE_TEMP_MAX, CURVE_TEMP_MIN } from "./curvePoints";
 
 const props = defineProps<{
   modelValue: [number, number][];
@@ -14,8 +15,8 @@ const emit = defineEmits<{
 const t = useTranslate();
 
 // X axis: 20–100 °C. Y axis: 0–100 %.
-const X_MIN = 20;
-const X_MAX = 100;
+const X_MIN = CURVE_TEMP_MIN;
+const X_MAX = CURVE_TEMP_MAX;
 const Y_MIN = 0;
 const Y_MAX = 100;
 const W = 480;
@@ -45,6 +46,16 @@ const sorted = computed(() => {
   const copy = [...props.modelValue].map((p, i) => ({ p, i }));
   copy.sort((a, b) => a.p[0] - b.p[0]);
   return copy;
+});
+
+// The daemon holds the first and last speeds outside the curve, so the fill extends to both axes.
+const areaPath = computed(() => {
+  const pts = sorted.value;
+  if (pts.length === 0) return "";
+  const first = pts[0].p;
+  const last = pts[pts.length - 1].p;
+  const line = pts.map((pt) => `L ${xToPx(pt.p[0])} ${yToPx(pt.p[1])}`).join(" ");
+  return `M ${xToPx(X_MIN)} ${yToPx(Y_MIN)} L ${xToPx(X_MIN)} ${yToPx(first[1])} ${line} L ${xToPx(X_MAX)} ${yToPx(last[1])} L ${xToPx(X_MAX)} ${yToPx(Y_MIN)} Z`;
 });
 
 const linePath = computed(() => {
@@ -191,6 +202,15 @@ function pointPx(pt: [number, number]) {
         </text>
       </g>
       <!-- curve -->
+      <defs>
+        <linearGradient id="curve-temp-band" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="var(--temp-cool)" />
+          <stop offset="0.55" stop-color="var(--temp-warm)" />
+          <stop offset="1" stop-color="var(--temp-hot)" />
+        </linearGradient>
+      </defs>
+      <rect :x="PAD" :y="H - PAD + 1" :width="innerW" height="4" rx="2" fill="url(#curve-temp-band)" />
+      <path v-if="areaPath" :d="areaPath" class="area" />
       <path :d="linePath" class="curve" v-if="linePath" />
       <!-- points -->
       <g v-for="(pt, idx) in sorted" :key="pt.i">
@@ -218,7 +238,7 @@ function pointPx(pt: [number, number]) {
             :y="pointPx(pt.p).cy - 34"
             width="104"
             height="22"
-            rx="4"
+            rx="11"
           />
           <text :x="pointPx(pt.p).cx" :y="pointPx(pt.p).cy - 19" text-anchor="middle">
             {{ pt.p[0] }}°C → {{ pt.p[1] }}%
@@ -240,13 +260,10 @@ function pointPx(pt: [number, number]) {
   display: block;
   /* Fixed height keeps the plot compact instead of stretching to fill the
      full card width (which made it ~650px tall). Width follows the viewBox. */
-  height: 260px;
+  height: 280px;
   width: auto;
   max-width: 100%;
   margin: 0 auto;
-  background: var(--bg-base);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
   user-select: none;
 }
 .svg.disabled {
@@ -254,31 +271,39 @@ function pointPx(pt: [number, number]) {
   pointer-events: none;
 }
 .grid line {
-  stroke: var(--border);
+  stroke: var(--md-outline-variant);
   stroke-width: 1;
 }
 .axis-label text {
-  fill: var(--text-muted);
+  fill: var(--md-on-surface-variant);
   font-size: 10px;
 }
 .axis-title {
-  fill: var(--text-secondary);
+  fill: var(--md-on-surface-variant);
   font-size: 11px;
+}
+.area {
+  fill: var(--md-primary);
+  fill-opacity: 0.16;
+  pointer-events: none;
 }
 .curve {
   fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
+  stroke: var(--md-primary);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .point {
-  fill: var(--accent);
-  stroke: #fff;
-  stroke-width: 1.5;
+  fill: var(--md-surface-container-low);
+  stroke: var(--md-primary);
+  stroke-width: 2.5;
   pointer-events: none;
   transition: r 0.1s;
 }
 .point.hover {
-  r: 6.5;
+  r: 7;
+  fill: var(--md-primary);
 }
 .point-hit {
   fill: transparent;
@@ -288,12 +313,12 @@ function pointPx(pt: [number, number]) {
   cursor: grabbing;
 }
 .tooltip rect {
-  fill: var(--bg-elevated);
-  stroke: var(--border-strong);
+  fill: var(--md-inverse-surface);
 }
 .tooltip text {
-  fill: var(--text-primary);
+  fill: var(--md-inverse-on-surface);
   font-size: 11px;
+  font-weight: 600;
 }
 .hint {
   color: var(--text-muted);

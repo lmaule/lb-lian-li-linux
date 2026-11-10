@@ -4,6 +4,16 @@ export default {
     daemonRunning: "Is the daemon running?",
     switchTimeout: "{name}: the daemon did not detect the panel in its new mode. Check the daemon log for USB hotplug warnings before retrying.",
   },
+  hero: {
+    eyebrow: "Overview",
+    connected: "Connected devices",
+    cpu: "CPU",
+    gpu: "GPU",
+    cooling: "Fans and pumps",
+    lighting: "Lighting",
+    screens: "Screens",
+    hardware: "Connected hardware",
+  },
   summary: {
     fanGroupOne: "{count} fan group",
     fanGroupMany: "{count} fan groups",
