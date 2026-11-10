@@ -1,6 +1,7 @@
 //! Tauri command handlers + multi-window setup for the Lian Li Linux GUI.
 
 mod command_error;
+mod desktop_appearance;
 mod diagnostic_export;
 mod external_link;
 mod installation;
@@ -409,6 +410,7 @@ pub fn run() {
             service_change,
             container_setup_proposal,
             container_setup,
+            desktop_appearance::desktop_appearance,
         ])
         .setup(|app| {
             tauri::async_runtime::spawn_blocking(|| {
@@ -417,6 +419,7 @@ pub fn run() {
                 }
             });
             session_worker::start();
+            desktop_appearance::watch(app.handle().clone());
             if let Some(win) = app.get_webview_window("main") {
                 apply_platform_decorations(&win);
                 #[cfg(debug_assertions)]

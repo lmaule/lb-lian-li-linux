@@ -6,6 +6,15 @@ export default {
     refreshNow: "Refresh now",
     saveFailed: "Save failed: {error}",
   },
+  pageSubtitle: {
+    devices: "Everything Lian Li Linux can see and control",
+    lcd: "Screens, media and sensor gauges",
+    fans: "Curves and speed for every fan",
+    rgb: "Effects and colors for every lighting device",
+    aio: "Pump, cooler fans and lighting",
+    settings: "Appearance, language, services and daemon",
+    installation: "Service, permissions and system setup checks",
+  },
   sidebar: {
     connected: "Connected",
     lastSeen: "Last seen: {summary}",

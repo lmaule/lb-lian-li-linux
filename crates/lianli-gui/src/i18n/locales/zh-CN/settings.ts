@@ -1,6 +1,27 @@
 import type en from "../en/settings";
 
 const messages: typeof en = {
+  appearance: {
+    title: "外观",
+    style: "样式",
+    styleHint: "“跟随系统”会使用桌面的浅色或深色偏好。",
+    system: "跟随系统",
+    light: "浅色",
+    dark: "深色",
+    accent: "强调色",
+    followDesktop: "跟随桌面强调色",
+    detected: "从桌面检测到：{color}",
+    notShared: "桌面未提供强调色，因此使用默认颜色。",
+    custom: "自定义颜色",
+    useColor: "使用 {color}",
+    pickColor: "选择任意颜色",
+    preview: "根据强调色生成的颜色",
+    rolePrimary: "主色",
+    rolePrimaryContainer: "主色容器",
+    roleSecondary: "辅助色",
+    roleTertiary: "第三色",
+    roleSurface: "表面",
+  },
   configuration: {
     title: "配置",
     hidBackend: "HID 后端",

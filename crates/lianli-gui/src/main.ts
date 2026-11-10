@@ -5,6 +5,7 @@ import App from "./App.vue";
 import { router } from "./router";
 import { i18n } from "./i18n";
 import { migrateStoredKeys } from "./utils/storedPreference";
+import "@fontsource-variable/outfit";
 import "./styles/theme.css";
 
 migrateStoredKeys();

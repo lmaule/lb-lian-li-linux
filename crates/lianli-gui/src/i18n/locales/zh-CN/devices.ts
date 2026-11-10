@@ -6,6 +6,16 @@ const messages: typeof en = {
     daemonRunning: "守护进程是否正在运行？",
     switchTimeout: "{name}：守护进程未检测到切换到新模式后的面板。重试前，请检查守护进程日志中的 USB 热插拔警告。",
   },
+  hero: {
+    eyebrow: "概览",
+    connected: "已连接设备",
+    cpu: "CPU",
+    gpu: "GPU",
+    cooling: "风扇和水泵",
+    lighting: "灯光",
+    screens: "屏幕",
+    hardware: "已连接的硬件",
+  },
   summary: {
     fanGroupOne: "{count} 个风扇组",
     fanGroupMany: "{count} 个风扇组",

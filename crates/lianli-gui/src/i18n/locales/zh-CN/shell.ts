@@ -8,6 +8,15 @@ const messages: typeof en = {
     refreshNow: "立即刷新",
     saveFailed: "保存失败：{error}",
   },
+  pageSubtitle: {
+    devices: "Lian Li Linux 能识别和控制的所有设备",
+    lcd: "屏幕、素材和传感器仪表",
+    fans: "所有风扇的曲线与转速",
+    rgb: "所有灯光设备的灯效与颜色",
+    aio: "水泵、冷排风扇和灯光",
+    settings: "外观、语言、服务和守护进程",
+    installation: "服务、权限和系统设置检查",
+  },
   sidebar: {
     connected: "已连接",
     lastSeen: "上次检测到：{summary}",
