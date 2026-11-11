@@ -12,7 +12,11 @@
 <table>
   <tr>
     <td><img src="docs/screenshots/devices.png" alt="Devices page with connected hardware, temperatures and device cards"></td>
-    <td><img src="docs/screenshots/fans.png" alt="Fans page with a speed mode for each port and fixed speeds"></td>
+    <td><img src="docs/screenshots/fan-curve.png" alt="Fan curve with typed points and the live temperature marker"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/fans.png" alt="Fans page with a speed mode for every fan and an All fans control"></td>
+    <td><img src="docs/screenshots/rgb.png" alt="RGB page with a lighting preview and effect controls"></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/lcd.png" alt="LCD page with screen settings and a live preview"></td>
