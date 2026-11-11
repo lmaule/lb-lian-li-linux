@@ -540,6 +540,12 @@ impl ServiceManager {
         );
 
         let desktop_streams = self.desktop_displays.statuses();
+        let curve_temperatures = self
+            .controllers
+            .fan
+            .as_ref()
+            .map(|fan| fan.curve_temperatures())
+            .unwrap_or_default();
         {
             let mut ipc_state = self.ipc.state.lock();
             for (index, status) in &mut ipc_state.telemetry.media_preparation {
@@ -551,6 +557,7 @@ impl ServiceManager {
             ipc_state.telemetry.openrgb_status = openrgb_status;
             ipc_state.telemetry.fan_rpms = fan_rpms;
             ipc_state.telemetry.coolant_temps = coolant_temps;
+            ipc_state.telemetry.curve_temperatures = curve_temperatures;
             ipc_state.telemetry.pixel_clean_statuses = ipc_state.pixel_clean_statuses();
             ipc_state.telemetry.unresponsive_dongle = self.wireless_recovery.unresponsive_dongle();
             ipc_state.devices = devices;

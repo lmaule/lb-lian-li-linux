@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import type { DeviceInfo, TelemetrySnapshot } from "@/types";
+import type { CurveTemperature, DeviceInfo, TelemetrySnapshot } from "@/types";
 import { DONGLE_FAMILIES } from "@/constants";
 import { usePendingAction } from "@/composables/usePendingAction";
 import { DISPLAY_SWITCH_TIMEOUT_MS, displaySwitchComplete } from "@/utils/displaySwitch";
@@ -196,6 +196,10 @@ export const useDevicesStore = defineStore("devices", () => {
     return telemetry.value.coolant_temps[deviceId] ?? null;
   }
 
+  function curveTemperature(curveName: string): CurveTemperature | null {
+    return telemetry.value.curve_temperatures?.[curveName] ?? null;
+  }
+
   function applyPoll(devices: DeviceInfo[], snap: TelemetrySnapshot) {
     for (const [id, source] of Object.entries(displaySwitches.value)) {
       if (displaySwitchComplete(source, devices)) finishDisplaySwitch(id);
@@ -222,6 +226,7 @@ export const useDevicesStore = defineStore("devices", () => {
     byId,
     fanRpms,
     coolantTemp,
+    curveTemperature,
     applyPoll,
   };
 });

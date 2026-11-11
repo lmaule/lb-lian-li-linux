@@ -5,6 +5,18 @@ export default {
     refreshing: "Refreshing…",
     refreshNow: "Refresh now",
     saveFailed: "Save failed: {error}",
+    saved: "Changes saved",
+  },
+  loading: "Connecting to the daemon…",
+  unsaved: {
+    title: "Unsaved changes.",
+    body: "Save to keep them after the app or daemon restarts.",
+    shortcut: "Press {keys} to save",
+    pageHasChanges: "This page has unsaved changes",
+    closeTitle: "Save changes before closing?",
+    closeBody: "Unsaved changes are lost if you close without saving. Lighting you previewed can stay on your devices until you save or the daemon restarts.",
+    closeDiscard: "Close without saving",
+    closeSave: "Save and close",
   },
   pageSubtitle: {
     devices: "Everything Lian Li Linux can see and control",

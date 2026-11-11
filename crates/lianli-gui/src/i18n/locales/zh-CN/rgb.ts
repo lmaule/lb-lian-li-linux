@@ -119,6 +119,12 @@ const messages: typeof en = {
   ledStrip: {
     led: "LED {index}",
   },
+  preview: {
+    label: "灯光设置预览",
+    caption: "这些设置的预览 · 近似效果",
+    mbSync: "跟随主板 RGB 接口",
+    fan: "风扇 {index}",
+  },
   modes: {
     off: "关闭",
     direct: "直接控制",

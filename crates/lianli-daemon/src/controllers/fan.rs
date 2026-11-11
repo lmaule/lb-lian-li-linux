@@ -6,7 +6,9 @@ use crate::service::DaemonEvent;
 use lianli_devices::traits::FanDevice;
 use lianli_devices::wireless::{build_payload, SensorSnapshot, WirelessController};
 use lianli_shared::fan::{interpolate_curve, FanConfig, FanCurve, FanSpeed};
+use lianli_shared::ipc::CurveTemperature;
 use lianli_shared::sensors::{self, picker, ResolvedSensor, SensorInfo, SensorSource};
+use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -25,9 +27,14 @@ pub struct FanController {
     stop_flag: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
     daemon_tx: Option<Sender<DaemonEvent>>,
+    curve_temperatures: Arc<Mutex<HashMap<String, CurveTemperature>>>,
 }
 
 impl FanController {
+    pub fn curve_temperatures(&self) -> HashMap<String, CurveTemperature> {
+        self.curve_temperatures.lock().clone()
+    }
+
     pub fn matches_config(&self, config: &lianli_shared::config::AppConfig) -> bool {
         self.config == config.fans.clone().unwrap_or_default()
             && self.curves
@@ -64,6 +71,7 @@ impl FanController {
             stop_flag: Arc::new(AtomicBool::new(false)),
             thread: None,
             daemon_tx,
+            curve_temperatures: Arc::default(),
         }
     }
 
@@ -78,6 +86,7 @@ impl FanController {
             all_sensors: lianli_shared::sensors::enumerate_sensors(),
             rgb_drift_enabled: self.rgb_drift_enabled,
             rgb_drift_interval: self.rgb_drift_interval,
+            curve_temperatures: Arc::clone(&self.curve_temperatures),
         };
         let thread = thread::spawn(move || fan_control_thread(inputs));
 
@@ -102,6 +111,28 @@ struct FanControlInputs {
     all_sensors: Vec<SensorInfo>,
     rgb_drift_enabled: bool,
     rgb_drift_interval: Duration,
+    curve_temperatures: Arc<Mutex<HashMap<String, CurveTemperature>>>,
+}
+
+/// Curves whose sensor the controller does not sample are omitted, so callers can tell
+/// an unused curve from one that has lost its reading.
+fn current_curve_temperatures(
+    curves: &HashMap<String, FanCurve>,
+    temperatures: &HashMap<SensorSource, TemperatureState>,
+) -> HashMap<String, CurveTemperature> {
+    curves
+        .iter()
+        .filter_map(|(name, curve)| {
+            let state = temperatures.get(&curve.effective_source())?;
+            Some((
+                name.clone(),
+                CurveTemperature {
+                    celsius: state.current,
+                    full_speed_fallback: state.fallback,
+                },
+            ))
+        })
+        .collect()
 }
 
 #[derive(Default)]
@@ -122,6 +153,7 @@ fn fan_control_thread(inputs: FanControlInputs) {
         all_sensors,
         rgb_drift_enabled,
         rgb_drift_interval,
+        curve_temperatures,
     } = inputs;
     let all_sensors = all_sensors.as_slice();
     let update_interval = Duration::from_millis(config.update_interval_ms.clamp(100, 10_000));
@@ -459,6 +491,8 @@ fn fan_control_thread(inputs: FanControlInputs) {
             thread::sleep(Duration::from_millis(5));
         }
 
+        *curve_temperatures.lock() = current_curve_temperatures(&curves, &temperatures);
+
         // Re-apply RGB immediately if wireless fan PWM changed, to prevent
         // the ~1s rainbow flicker caused by RF fan packets interrupting the
         // device's RGB stream.
@@ -781,6 +815,50 @@ mod sync_tests {
         assert!(state.needs_poll(now + Duration::from_secs(11)));
         state.update(Some(80.0), now + Duration::from_secs(7));
         assert!(!state.recovered);
+    }
+
+    #[test]
+    fn curve_temperatures_report_readings_and_fallback_for_sampled_curves_only() {
+        let sensor = |label: &str| SensorSource::Hwmon {
+            name: "test".into(),
+            label: label.into(),
+            device_path: String::new(),
+        };
+        let curve = |name: &str, source: SensorSource| FanCurve {
+            name: name.into(),
+            temp_source: Some(source),
+            temp_command: String::new(),
+            curve: vec![(20.0, 20.0), (100.0, 100.0)],
+        };
+        let curves = HashMap::from([
+            ("cpu".to_string(), curve("cpu", sensor("cpu"))),
+            ("lost".to_string(), curve("lost", sensor("lost"))),
+            ("unused".to_string(), curve("unused", sensor("unused"))),
+        ]);
+        let now = Instant::now();
+        let mut reading = TemperatureState::default();
+        reading.update(Some(58.0), now);
+        let mut lost = TemperatureState::default();
+        lost.update(None, now);
+        let temperatures = HashMap::from([(sensor("cpu"), reading), (sensor("lost"), lost)]);
+
+        let published = current_curve_temperatures(&curves, &temperatures);
+
+        assert_eq!(
+            published.get("cpu"),
+            Some(&CurveTemperature {
+                celsius: Some(58.0),
+                full_speed_fallback: false
+            })
+        );
+        assert_eq!(
+            published.get("lost"),
+            Some(&CurveTemperature {
+                celsius: None,
+                full_speed_fallback: true
+            })
+        );
+        assert!(!published.contains_key("unused"));
     }
 
     #[test]

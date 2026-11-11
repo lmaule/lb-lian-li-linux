@@ -62,6 +62,16 @@ const messages: typeof en = {
     stopped: "已停止",
     mbPortWide: "主板同步作用于整个控制器，因此其上的所有风扇都跟随同一个接口。",
   },
+  live: {
+    rightNow: "当前",
+    marker: "{temp} °C → {speed}%",
+    notInUse: "暂无实时读数。有风扇使用此曲线后即会显示。",
+    fallback: "没有温度读数。使用此曲线的风扇将全速运行，直到读数恢复。",
+    defaultSource: "默认：thermal zone 0",
+    defaultSourceHint: "未选择传感器，守护进程将读取 thermal zone 0。选择 CPU 或 GPU 传感器可使曲线更准确。",
+    allFansCurveTitle: "所有风扇都使用所选曲线（{name}）",
+    allFansMbTitle: "主板同步需按设备分别选择",
+  },
   points: {
     title: "曲线点",
     hint: "可在此输入精确数值，或在图表上拖动点。",

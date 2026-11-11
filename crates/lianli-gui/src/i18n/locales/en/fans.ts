@@ -60,6 +60,16 @@ export default {
     stopped: "Stopped",
     mbPortWide: "Motherboard sync applies to the whole controller, so every fan on it follows the same header.",
   },
+  live: {
+    rightNow: "Right now",
+    marker: "{temp} °C → {speed}%",
+    notInUse: "No live reading. It appears once a fan uses this curve.",
+    fallback: "No temperature reading. Fans on this curve run at full speed until it returns.",
+    defaultSource: "Default: thermal zone 0",
+    defaultSourceHint: "No sensor chosen, so the daemon reads thermal zone 0. Choose your CPU or GPU sensor for a more accurate curve.",
+    allFansCurveTitle: "Use the selected curve ({name}) for every fan",
+    allFansMbTitle: "Motherboard sync is chosen per device",
+  },
   points: {
     title: "Curve points",
     hint: "Type exact values here, or drag the points on the chart.",

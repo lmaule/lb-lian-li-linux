@@ -47,6 +47,7 @@ export const useDaemonStore = defineStore("daemon", () => {
   const openrgbPort = ref<number | null>(null);
   const unresponsiveDongle = ref<WirelessDongle | null>(null);
 
+  const ready = ref(false);
   let wasConnected = false;
   let lastDeviceCount = -1;
 
@@ -104,6 +105,8 @@ export const useDaemonStore = defineStore("daemon", () => {
       wasConnected = false;
       // eslint-disable-next-line no-console
       console.warn("poll failed", e);
+    } finally {
+      ready.value = true;
     }
   }
 
@@ -122,6 +125,7 @@ export const useDaemonStore = defineStore("daemon", () => {
   }
 
   return {
+    ready,
     connected,
     writeError,
     writeErrorUi,

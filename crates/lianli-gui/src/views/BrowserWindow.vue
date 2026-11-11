@@ -356,31 +356,40 @@ function previewAspect(t: CatalogTemplate): string {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  background: var(--md-surface);
 }
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
+  gap: var(--space-2) var(--space-3);
+  padding: 20px 28px 12px;
 }
 .title {
+  font-family: var(--font-display);
+  font-size: 28px;
   font-weight: 600;
+  letter-spacing: -0.3px;
 }
 .guide {
-  font-size: var(--font-size-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--md-primary);
   cursor: pointer;
-  padding: 0;
+  padding: 6px 12px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
 }
 .guide:hover {
-  color: var(--accent-hover);
+  background: color-mix(in srgb, var(--md-primary) 10%, transparent);
+}
+.guide:focus-visible {
+  outline: 2px solid var(--md-primary);
 }
 .spacer {
   flex: 1;
@@ -388,7 +397,7 @@ function previewAspect(t: CatalogTemplate): string {
 .content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: var(--space-1) 28px 28px;
 }
 .state {
   display: flex;
@@ -397,32 +406,44 @@ function previewAspect(t: CatalogTemplate): string {
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-8);
-  color: var(--text-muted);
+  color: var(--md-on-surface-variant);
 }
 .state.error {
   color: var(--danger);
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-4);
 }
 .tpl-card {
-  padding: var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid var(--md-outline-variant);
+}
+.info {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  flex: 1;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.info .n-button {
+  align-self: flex-start;
+  margin-top: auto;
 }
 .preview {
   display: block;
   padding: 0;
   width: 100%;
-  max-height: 220px;
+  max-height: 200px;
   /* aspect-ratio is set inline from each template's effective dimensions. */
-  background: #14171f;
-  border-radius: var(--radius-md);
+  background: #050507;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 0;
 }
 .preview:not(:disabled) {
   cursor: zoom-in;
@@ -431,8 +452,8 @@ function previewAspect(t: CatalogTemplate): string {
   cursor: default;
 }
 .preview:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: 2px solid var(--md-primary);
+  outline-offset: -3px;
 }
 .enlarged-preview {
   display: block;
@@ -451,8 +472,9 @@ function previewAspect(t: CatalogTemplate): string {
   height: 100%;
 }
 .name {
+  font-family: var(--font-display);
   font-weight: 600;
-  font-size: var(--font-size-sm);
+  font-size: 17px;
 }
 .author {
   font-size: var(--font-size-xs);
@@ -463,14 +485,16 @@ function previewAspect(t: CatalogTemplate): string {
   flex-wrap: wrap;
 }
 .badge {
-  font-size: var(--font-size-xs);
-  background: var(--bg-elevated);
-  padding: 1px var(--space-2);
-  border-radius: 999px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--md-secondary-container);
+  padding: 3px 9px;
+  border-radius: 8px;
+  color: var(--md-on-secondary-container);
 }
 .desc {
-  font-size: var(--font-size-xs);
+  font-size: 13px;
+  line-height: 1.45;
   min-height: 28px;
 }
 .spin {

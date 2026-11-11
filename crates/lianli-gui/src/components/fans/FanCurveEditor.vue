@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useTranslate } from "@/i18n";
-import { CURVE_TEMP_MAX, CURVE_TEMP_MIN } from "./curvePoints";
+import { CURVE_TEMP_MAX, CURVE_TEMP_MIN, speedAt } from "./curvePoints";
 
 const props = defineProps<{
   modelValue: [number, number][];
   disabled?: boolean;
+  liveCelsius?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -56,6 +57,19 @@ const areaPath = computed(() => {
   const last = pts[pts.length - 1].p;
   const line = pts.map((pt) => `L ${xToPx(pt.p[0])} ${yToPx(pt.p[1])}`).join(" ");
   return `M ${xToPx(X_MIN)} ${yToPx(Y_MIN)} L ${xToPx(X_MIN)} ${yToPx(first[1])} ${line} L ${xToPx(X_MAX)} ${yToPx(last[1])} L ${xToPx(X_MAX)} ${yToPx(Y_MIN)} Z`;
+});
+
+const liveMarker = computed(() => {
+  const celsius = props.liveCelsius;
+  if (celsius === null || celsius === undefined || !props.modelValue.length) return null;
+  const temp = clamp(celsius, X_MIN, X_MAX);
+  const speed = Math.round(speedAt(props.modelValue, celsius));
+  const x = xToPx(temp);
+  const y = yToPx(speed);
+  const labelX = clamp(x, PAD + 56, W - PAD - 56);
+  const labelY = y > PAD + 40 ? y - 30 : y + 14;
+  const tone = celsius < 60 ? "cool" : celsius < 80 ? "warm" : "hot";
+  return { x, y, labelX, labelY, tone, label: t("fans.live.marker", { temp: Math.round(celsius), speed }) };
 });
 
 const linePath = computed(() => {
@@ -213,6 +227,13 @@ function pointPx(pt: [number, number]) {
       <path v-if="areaPath" :d="areaPath" class="area" />
       <path :d="linePath" class="curve" v-if="linePath" />
       <!-- points -->
+      <g v-if="liveMarker" class="live" :class="`tone-${liveMarker.tone}`">
+        <line :x1="liveMarker.x" :x2="liveMarker.x" :y1="PAD" :y2="H - PAD" class="live-line" />
+        <line :x1="PAD" :x2="liveMarker.x" :y1="liveMarker.y" :y2="liveMarker.y" class="live-line faint" />
+        <circle :cx="liveMarker.x" :cy="liveMarker.y" r="7" class="live-dot" />
+        <rect :x="liveMarker.labelX - 52" :y="liveMarker.labelY" width="104" height="22" rx="11" class="live-label-bg" />
+        <text :x="liveMarker.labelX" :y="liveMarker.labelY + 15" text-anchor="middle" class="live-label">{{ liveMarker.label }}</text>
+      </g>
       <g v-for="(pt, idx) in sorted" :key="pt.i">
         <circle
           :cx="pointPx(pt.p).cx"
@@ -311,6 +332,33 @@ function pointPx(pt: [number, number]) {
 }
 .point-hit:active {
   cursor: grabbing;
+}
+.live {
+  pointer-events: none;
+}
+.live.tone-cool { --live: var(--temp-cool); }
+.live.tone-warm { --live: var(--temp-warm); }
+.live.tone-hot { --live: var(--temp-hot); }
+.live-line {
+  stroke: var(--live);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.live-line.faint {
+  opacity: 0.6;
+}
+.live-dot {
+  fill: var(--live);
+  stroke: var(--md-surface-container-low);
+  stroke-width: 3;
+}
+.live-label-bg {
+  fill: var(--md-inverse-surface);
+}
+.live-label {
+  fill: var(--md-inverse-on-surface);
+  font-size: 11px;
+  font-weight: 600;
 }
 .tooltip rect {
   fill: var(--md-inverse-surface);
