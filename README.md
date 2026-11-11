@@ -9,6 +9,19 @@
   Fan speed control, RGB/LED effects, LCD streaming, and sensor gauges for all Lian Li devices.
 </p>
 
+<table>
+  <tr>
+    <td><img src="docs/screenshots/devices.png" alt="Devices page with connected hardware, temperatures and device cards"></td>
+    <td><img src="docs/screenshots/fans.png" alt="Fans page with a speed mode for each port and fixed speeds"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/lcd.png" alt="LCD page with screen settings and a live preview"></td>
+    <td><img src="docs/screenshots/settings.png" alt="Appearance settings with the desktop accent color and light or dark style"></td>
+  </tr>
+</table>
+
+The interface follows your desktop's accent color and light or dark preference. Screenshots use sample devices.
+
 ### AI Disclaimer
 
 Generative AI was used during development in two areas:
