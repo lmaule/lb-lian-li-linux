@@ -9,11 +9,13 @@ import FanCurveEditor from "@/components/fans/FanCurveEditor.vue";
 import CurvePointsEditor from "@/components/fans/CurvePointsEditor.vue";
 import FanGroupCard from "@/components/fans/FanGroupCard.vue";
 import SensorSelect from "@/components/common/SensorSelect.vue";
+import SegmentedControl from "@/components/common/SegmentedControl.vue";
 import type { SensorSource, DeviceInfo } from "@/types";
 import { MB_SYNC_KEY } from "@/types";
 import { enumerateSensorsAsOptions } from "@/stores/sensorOptions";
 import { useTranslate } from "@/i18n";
 import { decodeSpeedMode, fillSlots, speedModeOf } from "@/components/fans/speedMode";
+import { speedAt } from "@/components/fans/curvePoints";
 
 const config = useConfigStore();
 const devices = useDevicesStore();
@@ -85,6 +87,55 @@ const allFansMode = computed(() => {
   const [mode] = modes;
   return modes.size === 1 && allFanModeOptions.value.some((option) => option.value === mode) ? mode : null;
 });
+
+type ModeKind = "curve" | "fixed" | "mb" | "off";
+
+const allFansKind = computed<ModeKind | null>(() => {
+  const mode = allFansMode.value;
+  if (mode === null || mode === undefined) return null;
+  if (mode === "constant") return "fixed";
+  if (mode === "off") return "off";
+  if (mode === MB_SYNC_KEY) return "mb";
+  return "curve";
+});
+
+const allFansKindOptions = computed(() => [
+  {
+    value: "curve" as const,
+    label: t("fans.groupCard.modeCurve"),
+    disabled: !curves.value.length,
+    title: current.value ? t("fans.live.allFansCurveTitle", { name: current.value.name }) : t("fans.groupCard.noCurves"),
+  },
+  { value: "fixed" as const, label: t("fans.groupCard.modeFixed") },
+  { value: "mb" as const, label: t("fans.groupCard.modeMbSync"), disabled: true, title: t("fans.live.allFansMbTitle") },
+  { value: "off" as const, label: t("common.off") },
+]);
+
+function onAllFansKind(kind: ModeKind) {
+  if (kind === "mb") return;
+  if (kind === "curve") {
+    const name = current.value?.name ?? curves.value[0]?.name;
+    if (name) applyToAllFans(`curve:${name}`);
+    return;
+  }
+  applyToAllFans(kind === "fixed" ? "constant" : "off");
+}
+
+const liveReading = computed(() => (current.value ? devices.curveTemperature(current.value.name) : null));
+
+const liveState = computed(() => {
+  const reading = liveReading.value;
+  if (!reading || !current.value) return { kind: "idle", text: t("fans.live.notInUse"), tone: "" };
+  if (reading.full_speed_fallback || reading.celsius === null) {
+    return { kind: "fallback", text: t("fans.live.fallback"), tone: "" };
+  }
+  const celsius = reading.celsius;
+  const speed = Math.round(speedAt(current.value.curve, celsius));
+  const tone = celsius < 60 ? "cool" : celsius < 80 ? "warm" : "hot";
+  return { kind: "reading", text: t("fans.live.marker", { temp: Math.round(celsius), speed }), tone };
+});
+
+const usesDefaultSource = computed(() => !current.value?.temp_source && !current.value?.temp_command);
 
 function applyToAllFans(value: string) {
   const option = allFanModeOptions.value.find((o) => o.value === value);
@@ -264,6 +315,7 @@ function onHysteresisPwm(percent: number | null) {
         <div class="curve-main">
           <FanCurveEditor
             :model-value="current.curve"
+            :live-celsius="liveReading?.celsius ?? null"
             @update:model-value="onCurveChange"
           />
           <CurvePointsEditor
@@ -272,6 +324,11 @@ function onHysteresisPwm(percent: number | null) {
           />
         </div>
         <div class="curve-side">
+          <div class="now" :class="liveState.kind === 'reading' ? `tone-${liveState.tone}` : liveState.kind">
+            <span class="now-label">{{ t("fans.live.rightNow") }}</span>
+            <span v-if="liveState.kind === 'reading'" class="now-value">{{ liveState.text }}</span>
+            <span v-else class="now-text">{{ liveState.text }}</span>
+          </div>
           <div class="field">
             <label class="muted">{{ t("fans.page.name") }}</label>
             <n-input
@@ -285,11 +342,13 @@ function onHysteresisPwm(percent: number | null) {
             <label class="muted">{{ t("fans.page.temperatureSource") }}</label>
             <SensorSelect
               size="small"
-              :value="tempSourceValue"
+              :value="tempSourceValue || null"
               :options="sensorOptions"
+              :placeholder="t('fans.live.defaultSource')"
               @update:value="onTempSource"
               filterable
             />
+            <span v-if="usesDefaultSource" class="source-hint">{{ t("fans.live.defaultSourceHint") }}</span>
           </div>
           <div class="field" v-if="tempSourceValue === 'command' || tempSourceValue === ''">
             <label class="muted">{{ t("fans.page.customCommand") }}</label>
@@ -323,12 +382,13 @@ function onHysteresisPwm(percent: number | null) {
         <h2 class="section-title">{{ t("fans.page.fanSpeedAssignments") }}</h2>
         <div v-if="assignmentGroups.length > 1" class="all-fans">
           <span class="muted">{{ t("fans.page.allFans") }}</span>
-          <n-select
+          <span v-if="allFansKind === null" class="mixed">{{ t("fans.groupCard.mixed") }}</span>
+          <SegmentedControl
             size="small"
-            :value="allFansMode"
-            :options="allFanModeOptions"
-            :placeholder="t('fans.groupCard.mixed')"
-            @update:value="applyToAllFans"
+            :model-value="allFansKind"
+            :options="allFansKindOptions"
+            :label="t('fans.page.allFans')"
+            @update:model-value="onAllFansKind"
           />
         </div>
       </div>
@@ -498,8 +558,53 @@ function onHysteresisPwm(percent: number | null) {
 .all-fans .muted {
   white-space: nowrap;
 }
-.all-fans .n-select {
-  width: 220px;
+.all-fans {
+  flex-wrap: wrap;
+}
+.mixed {
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface-variant);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+.now {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 18px;
+  background: var(--md-surface-container-high);
+}
+.now-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+}
+.now-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.now-text {
+  font-size: 13px;
+  color: var(--md-on-surface-variant);
+}
+.now.tone-cool .now-value { color: var(--temp-cool); }
+.now.tone-warm .now-value { color: var(--temp-warm); }
+.now.tone-hot .now-value { color: var(--temp-hot); }
+.now.fallback {
+  background: color-mix(in srgb, var(--danger) 16%, var(--md-surface-container-high));
+}
+.now.fallback .now-text {
+  color: var(--md-on-surface);
+}
+.source-hint {
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  color: var(--md-on-surface-variant);
 }
 .used-by {
   font-size: var(--font-size-sm);

@@ -7,6 +7,18 @@ const messages: typeof en = {
     refreshing: "正在刷新…",
     refreshNow: "立即刷新",
     saveFailed: "保存失败：{error}",
+    saved: "更改已保存",
+  },
+  loading: "正在连接守护进程…",
+  unsaved: {
+    title: "有未保存的更改。",
+    body: "保存后，应用或守护进程重启时仍会保留这些更改。",
+    shortcut: "按 {keys} 保存",
+    pageHasChanges: "此页面有未保存的更改",
+    closeTitle: "关闭前保存更改？",
+    closeBody: "如果不保存就关闭，未保存的更改将丢失。你预览过的灯效可能会保留在设备上，直到你保存或守护进程重启。",
+    closeDiscard: "不保存并关闭",
+    closeSave: "保存并关闭",
   },
   pageSubtitle: {
     devices: "Lian Li Linux 能识别和控制的所有设备",

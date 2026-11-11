@@ -14,6 +14,8 @@ import InstallationNotice from "@/components/common/InstallationNotice.vue";
 import CompatibilityNotice from "@/components/common/CompatibilityNotice.vue";
 import WirelessNotice from "@/components/common/WirelessNotice.vue";
 import UpdateNotice from "@/components/common/UpdateNotice.vue";
+import UnsavedChanges from "@/components/layout/UnsavedChanges.vue";
+import PageLoading from "@/components/layout/PageLoading.vue";
 
 const daemon = useDaemonStore();
 const config = useConfigStore();
@@ -77,11 +79,13 @@ onUnmounted(() => {
                 <AppHeader />
                 <div class="content">
                   <div class="notices">
+                    <UnsavedChanges />
                     <CompatibilityNotice />
                     <WirelessNotice />
                     <UpdateNotice />
                   </div>
-                  <router-view v-slot="{ Component }">
+                  <PageLoading v-if="!daemon.ready" />
+                  <router-view v-else v-slot="{ Component }">
                     <transition name="page" mode="out-in">
                       <component :is="Component" />
                     </transition>

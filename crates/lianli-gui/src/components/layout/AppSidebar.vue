@@ -7,7 +7,9 @@ import { useTranslate } from "@/i18n";
 import { MAIN_ROUTES } from "@/router";
 import { useDaemonStore } from "@/stores/daemon";
 import { useDevicesStore } from "@/stores/devices";
+import { useConfigStore } from "@/stores/config";
 
+const config = useConfigStore();
 const daemon = useDaemonStore();
 const devices = useDevicesStore();
 const t = useTranslate();
@@ -56,6 +58,7 @@ function iconFor(name: string) {
       >
         <component :is="iconFor(r.icon)" :size="20" :stroke-width="2" />
         <span class="nav-label">{{ t(r.labelKey) }}</span>
+        <span v-if="config.dirtyPages.includes(r.name)" class="dirty-dot" role="img" :aria-label="t('shell.unsaved.pageHasChanges')" :title="t('shell.unsaved.pageHasChanges')" />
       </RouterLink>
       <div class="nav-spacer" />
       <RouterLink
@@ -68,6 +71,7 @@ function iconFor(name: string) {
       >
         <component :is="iconFor(r.icon)" :size="20" :stroke-width="2" />
         <span class="nav-label">{{ t(r.labelKey) }}</span>
+        <span v-if="config.dirtyPages.includes(r.name)" class="dirty-dot" role="img" :aria-label="t('shell.unsaved.pageHasChanges')" :title="t('shell.unsaved.pageHasChanges')" />
       </RouterLink>
     </nav>
 
@@ -162,9 +166,17 @@ function iconFor(name: string) {
   font-weight: 600;
 }
 .nav-label {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.dirty-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--warning);
 }
 .status {
   margin-top: var(--space-3);
@@ -213,8 +225,14 @@ function iconFor(name: string) {
     display: none;
   }
   .nav-item {
+    position: relative;
     justify-content: center;
     padding: 0;
+  }
+  .dirty-dot {
+    position: absolute;
+    top: 10px;
+    right: 14px;
   }
   .status {
     display: flex;

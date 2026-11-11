@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { Copy, Image as ImageIcon, Palette, Save, X } from "lucide-vue-next";
+import { Copy, Save, X } from "lucide-vue-next";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { pickMediaFile } from "@/utils/mediaPicker";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -14,6 +14,7 @@ import WidgetCanvas from "@/components/editor/WidgetCanvas.vue";
 import PropertiesPanel from "@/components/editor/PropertiesPanel.vue";
 import ColorPicker from "@/components/rgb/ColorPicker.vue";
 import MediaAccessNotice from "@/components/lcd/MediaAccessNotice.vue";
+import SegmentedControl from "@/components/common/SegmentedControl.vue";
 import { screenPresets } from "@/constants/screen";
 import { sourceConfigsAsOptions, inferSensorCategory } from "@/stores/sensorOptions";
 import { useTranslate } from "@/i18n";
@@ -161,6 +162,10 @@ function onRotated(v: boolean) {
 const lastBgColor = ref<RGBA>([0, 0, 0, 255]);
 
 const bgType = computed(() => template.value?.background.type ?? "color");
+const backgroundOptions = computed(() => [
+  { value: "color" as const, label: t("editor.window.backgroundColor") },
+  { value: "image" as const, label: t("editor.window.backgroundImage") },
+]);
 
 function onBgColor(v: RGB | RGBA) {
   const rgba: RGBA = [v[0], v[1], v[2], v.length === 4 ? v[3] : 255];
@@ -484,12 +489,13 @@ function commitName() {
       />
       <n-checkbox :checked="template?.rotated ?? false" @update:checked="onRotated">{{ t("editor.window.rotated") }}</n-checkbox>
       <div class="bg-group">
-        <n-button size="tiny" :type="bgType === 'color' ? 'primary' : 'default'" :ghost="bgType !== 'color'" @click="setBgColorMode">
-          <template #icon><Palette :size="12" /></template>{{ t("editor.window.backgroundColor") }}
-        </n-button>
-        <n-button size="tiny" :type="bgType === 'image' ? 'primary' : 'default'" :ghost="bgType !== 'image'" @click="pickBgImage">
-          <template #icon><ImageIcon :size="12" /></template>{{ t("editor.window.backgroundImage") }}
-        </n-button>
+        <SegmentedControl
+          size="small"
+          :model-value="bgType"
+          :options="backgroundOptions"
+          :label="t('editor.window.backgroundColor')"
+          @update:model-value="(kind) => (kind === 'color' ? setBgColorMode() : pickBgImage())"
+        />
         <ColorPicker
           v-if="bgType === 'color'"
           class="bg-picker"
@@ -554,14 +560,15 @@ function commitName() {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  background: var(--md-surface);
 }
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--md-surface-container);
   flex-shrink: 0;
 }
 .spacer {
@@ -573,7 +580,7 @@ function commitName() {
   gap: var(--space-1);
 }
 .bg-picker {
-  width: 64px;
+  width: 120px;
 }
 .bg-picker :deep(.n-color-pickerTrigger) {
   height: 24px;
@@ -583,12 +590,15 @@ function commitName() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--md-surface-container-high);
   font-size: var(--font-size-xs);
-  color: var(--text-secondary);
+  color: var(--md-on-surface-variant);
 }
 .status {
   font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  color: var(--md-on-surface-variant);
 }
 .status.err {
   color: var(--danger);
@@ -596,42 +606,44 @@ function commitName() {
 .panes {
   display: flex;
   flex: 1;
+  gap: var(--space-4);
   min-height: 0;
+  padding: var(--space-4);
 }
 .template-access {
   flex-shrink: 0;
   max-height: 25vh;
   overflow-y: auto;
-  padding: var(--space-1) var(--space-3);
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4) 0;
 }
 .pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  border-radius: 24px;
 }
 .left {
-  width: 240px;
-  border-right: 1px solid var(--border);
-  padding: var(--space-2);
+  width: 260px;
+  padding: var(--space-3);
   flex-shrink: 0;
   overflow: hidden;
+  background: var(--md-surface-container-low);
 }
 .center {
   flex: 1;
   min-width: 0;
   padding: var(--space-4);
-  background: var(--bg-base);
+  background: var(--md-surface-container);
   display: flex;
   flex-direction: column;
   align-items: stretch;
   overflow: hidden;
 }
 .right {
-  width: 320px;
-  border-left: 1px solid var(--border);
-  padding: var(--space-3);
+  width: 340px;
+  padding: var(--space-4);
   flex-shrink: 0;
   overflow: hidden;
+  background: var(--md-surface-container-low);
 }
 </style>

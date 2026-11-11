@@ -37,7 +37,8 @@ const emit = defineEmits<{ "update:modelValue": [value: T] }>();
   max-width: 100%;
   border: 1px solid var(--md-outline);
   border-radius: 20px;
-  overflow: hidden;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .segment {
   display: inline-flex;

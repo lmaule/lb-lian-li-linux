@@ -133,6 +133,8 @@ export interface TelemetrySnapshot {
   }>;
   fan_rpms: Record<string, number[]>;
   coolant_temps: Record<string, number>;
+  /** Missing on daemons older than the live curve marker. */
+  curve_temperatures?: Record<string, CurveTemperature>;
   streaming_active: boolean;
   openrgb_status: OpenRgbServerStatus;
   /** Active pixel cleaner sessions keyed by target ID, card index, or "all" for multi-LCD concurrency. */
@@ -141,6 +143,11 @@ export interface TelemetrySnapshot {
 }
 
 export type WirelessDongle = "transmitter" | "receiver";
+
+export interface CurveTemperature {
+  celsius: number | null;
+  full_speed_fallback: boolean;
+}
 
 export interface DesktopStreamStatus {
   bus: number;

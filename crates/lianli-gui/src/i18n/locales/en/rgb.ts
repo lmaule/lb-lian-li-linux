@@ -118,6 +118,12 @@ export default {
   ledStrip: {
     led: "LED {index}",
   },
+  preview: {
+    label: "Preview of the lighting settings",
+    caption: "Preview of these settings · approximate",
+    mbSync: "Following the motherboard's RGB header",
+    fan: "Fan {index}",
+  },
   modes: {
     off: "Off",
     direct: "Direct",

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useMessage } from "naive-ui";
 import { useRoute } from "vue-router";
 import { Moon, RefreshCw, Save, Sun } from "lucide-vue-next";
 import { useDaemonStore } from "@/stores/daemon";
@@ -8,14 +7,14 @@ import { useConfigStore } from "@/stores/config";
 import { useThemeStore } from "@/stores/theme";
 import { useTranslate, type MessageKey } from "@/i18n";
 import { MAIN_ROUTES } from "@/router";
+import { useSaveConfig } from "@/composables/useSaveConfig";
 
 const daemon = useDaemonStore();
 const config = useConfigStore();
 const theme = useThemeStore();
 const route = useRoute();
-const message = useMessage();
 const t = useTranslate();
-const saving = ref(false);
+const { saving, save } = useSaveConfig();
 
 type MainRouteName = (typeof MAIN_ROUTES)[number]["name"];
 
@@ -48,16 +47,8 @@ async function onRefresh() {
 }
 
 async function onSave() {
-  if (saving.value) return;
-  saving.value = true;
-  try {
-    await config.save();
-  } catch (error) {
-    message.error(t("shell.header.saveFailed", { error: error instanceof Error ? error.message : String(error) }), { duration: 10000 });
-  } finally {
-    saving.value = false;
-    (document.activeElement as HTMLElement | null)?.blur();
-  }
+  await save();
+  (document.activeElement as HTMLElement | null)?.blur();
 }
 
 function onToggleTheme() {

@@ -4,6 +4,7 @@ import { LCD_TEMPLATES_CHANGED_EVENT } from "@/stores/lcd";
 import { computed, reactive, ref } from "vue";
 import { useIpc } from "@/composables/useIpc";
 import { tr } from "@/i18n";
+import { router } from "@/router";
 import type {
   AppConfig,
   LcdTemplate,
@@ -50,6 +51,7 @@ export const useConfigStore = defineStore("config", () => {
   const config = reactive<AppConfig>(defaultConfig());
   const savedLcds = ref<LcdConfig[]>([]);
   const dirty = ref(false);
+  const dirtyPages = ref<string[]>([]);
   const loaded = ref(false);
 
   const rgbCaps = ref<RgbDeviceCapabilities[]>([]);
@@ -61,6 +63,10 @@ export const useConfigStore = defineStore("config", () => {
 
   function markDirty() {
     dirty.value = true;
+    const page = router.currentRoute.value.name;
+    if (typeof page === "string" && !dirtyPages.value.includes(page)) {
+      dirtyPages.value = [...dirtyPages.value, page];
+    }
   }
 
   /** Replace the entire config object (used after a daemon reload). */
@@ -68,6 +74,7 @@ export const useConfigStore = defineStore("config", () => {
     savedLcds.value = structuredClone(next.lcds);
     Object.assign(config, defaultConfig(), next);
     dirty.value = false;
+    dirtyPages.value = [];
     loaded.value = true;
     imported.value = null;
   }
@@ -119,6 +126,7 @@ export const useConfigStore = defineStore("config", () => {
       throw error;
     }
     dirty.value = false;
+    dirtyPages.value = [];
     await load();
   }
 
@@ -209,6 +217,7 @@ export const useConfigStore = defineStore("config", () => {
     config,
     savedLcds,
     dirty,
+    dirtyPages,
     loaded,
     rgbCaps,
     sensors,
