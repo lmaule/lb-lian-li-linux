@@ -97,6 +97,8 @@ sudo install -Dm755 target/release/lianli-gui /usr/bin/lianli-gui
 sudo install -Dm755 target/release/lianli-session /usr/bin/lianli-session
 sudo install -Dm755 target/release/lianli-control /usr/bin/lianli-control
 sudo install -Dm644 packaging/systemd/lianli-session.service /usr/lib/systemd/user/lianli-session.service
+sudo install -d /usr/lib/systemd/user/default.target.wants
+sudo ln -sfn ../lianli-session.service /usr/lib/systemd/user/default.target.wants/lianli-session.service
 sudo install -Dm644 packaging/desktop/com.sgtaziz.lianlilinux.session.desktop /etc/xdg/autostart/com.sgtaziz.lianlilinux.session.desktop
 
 sudo install -Dm644 packaging/systemd/lianli-daemon.service /usr/lib/systemd/user/lianli-daemon.service
