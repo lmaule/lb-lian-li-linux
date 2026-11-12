@@ -2,8 +2,6 @@ import type en from "../en/devices";
 
 const messages: typeof en = {
   page: {
-    noDevicesFound: "未找到设备",
-    daemonRunning: "守护进程是否正在运行？",
     switchTimeout: "{name}：守护进程未检测到切换到新模式后的面板。重试前，请检查守护进程日志中的 USB 热插拔警告。",
   },
   hero: {
@@ -66,7 +64,6 @@ const messages: typeof en = {
     },
   },
   aio: {
-    empty: "未检测到一体式水冷设备。",
     fan: "风扇 {index}",
     controlUnavailable: "控制通道不可用",
     pumpMbSyncUnavailable: "此设备不支持已保存的主板同步设置。请选择其他模式以控制水泵。",

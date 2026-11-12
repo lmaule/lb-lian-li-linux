@@ -58,7 +58,8 @@ function iconFor(name: string) {
       >
         <component :is="iconFor(r.icon)" :size="20" :stroke-width="2" />
         <span class="nav-label">{{ t(r.labelKey) }}</span>
-        <span v-if="config.dirtyPages.includes(r.name)" class="dirty-dot" role="img" :aria-label="t('shell.unsaved.pageHasChanges')" :title="t('shell.unsaved.pageHasChanges')" />
+        <icons.TriangleAlert v-if="r.name === 'fans' && daemon.connected && devices.failingCurves.length" class="warn-icon" :size="16" :stroke-width="2.4" role="img" :aria-label="t('fans.sensorLost.navTitle')" />
+        <span v-else-if="config.dirtyPages.includes(r.name)" class="dirty-dot" role="img" :aria-label="t('shell.unsaved.pageHasChanges')" :title="t('shell.unsaved.pageHasChanges')" />
       </RouterLink>
       <div class="nav-spacer" />
       <RouterLink
@@ -171,6 +172,10 @@ function iconFor(name: string) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.warn-icon {
+  flex-shrink: 0;
+  color: var(--warning);
+}
 .dirty-dot {
   width: 8px;
   height: 8px;
@@ -229,6 +234,7 @@ function iconFor(name: string) {
     justify-content: center;
     padding: 0;
   }
+  .warn-icon,
   .dirty-dot {
     position: absolute;
     top: 10px;

@@ -9,6 +9,7 @@ import { useDeviceNamesStore } from "@/stores/deviceNames";
 import { lcdEntryKey, orderedLcdIndices, resolveLcdDevice } from "@/utils/lcdSelection";
 import { useTranslate, type MessageKey } from "@/i18n";
 import LcdConfigCard from "@/components/lcd/LcdConfigCard.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import MediaAccessNotice from "@/components/lcd/MediaAccessNotice.vue";
 import ManagedMediaImport from "@/components/lcd/ManagedMediaImport.vue";
 import StartupImageDialog from "@/components/lcd/StartupImageDialog.vue";
@@ -247,6 +248,7 @@ function addLcd(deviceId: string) {
         :entry="current"
         :index="selected"
       />
+      <EmptyState v-else-if="!devices.lcdDevices.length" class="detail" kind="lcd" />
       <div v-else class="card detail empty muted">
         {{ t("lcd.page.selectHint") }}
       </div>

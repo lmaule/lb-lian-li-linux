@@ -20,8 +20,6 @@ export default {
     wirelessZoneCountOne: "Wireless · {count} zone",
     wirelessZoneCountMany: "Wireless · {count} zones",
     noRgbDevices: "No RGB devices detected.",
-    noRgbCapableDevices: "No RGB-capable devices detected.",
-    waitingForDaemon: "Waiting for the daemon to report RGB devices.",
   },
   deviceCard: {
     pingFailed: "Ping failed",
@@ -117,6 +115,11 @@ export default {
   },
   ledStrip: {
     led: "LED {index}",
+  },
+  colorPicker: {
+    choose: "Choose color, currently {color}",
+    chooseNamed: "{label}: choose color, currently {color}",
+    recent: "Recent",
   },
   preview: {
     label: "Preview of the lighting settings",

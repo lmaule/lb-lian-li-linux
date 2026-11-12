@@ -22,8 +22,6 @@ const messages: typeof en = {
     wirelessZoneCountOne: "无线 · {count} 个区域",
     wirelessZoneCountMany: "无线 · {count} 个区域",
     noRgbDevices: "未检测到 RGB 设备。",
-    noRgbCapableDevices: "未检测到支持 RGB 的设备。",
-    waitingForDaemon: "正在等待守护进程报告 RGB 设备。",
   },
   deviceCard: {
     pingFailed: "识别设备失败",
@@ -118,6 +116,11 @@ const messages: typeof en = {
   },
   ledStrip: {
     led: "LED {index}",
+  },
+  colorPicker: {
+    choose: "选择颜色，当前为 {color}",
+    chooseNamed: "{label}：选择颜色，当前为 {color}",
+    recent: "最近使用",
   },
   preview: {
     label: "灯光设置预览",

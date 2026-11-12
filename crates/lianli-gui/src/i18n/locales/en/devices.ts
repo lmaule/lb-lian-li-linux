@@ -1,7 +1,5 @@
 export default {
   page: {
-    noDevicesFound: "No devices found",
-    daemonRunning: "Is the daemon running?",
     switchTimeout: "{name}: the daemon did not detect the panel in its new mode. Check the daemon log for USB hotplug warnings before retrying.",
   },
   hero: {
@@ -64,7 +62,6 @@ export default {
     },
   },
   aio: {
-    empty: "No AIO devices detected.",
     fan: "Fan {index}",
     controlUnavailable: "Control channel unavailable",
     pumpMbSyncUnavailable: "Saved motherboard sync is unavailable on this device. Choose another mode to control the pump.",

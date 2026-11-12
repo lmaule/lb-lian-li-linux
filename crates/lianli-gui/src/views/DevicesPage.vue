@@ -2,13 +2,12 @@
 import { computed } from "vue";
 import { useDevicesStore, type DisplaySwitchError } from "@/stores/devices";
 import DeviceCard from "@/components/devices/DeviceCard.vue";
-import { Cpu, Fan, Monitor, Palette, PlugZap, Thermometer } from "lucide-vue-next";
-import { useDaemonStore } from "@/stores/daemon";
+import EmptyState from "@/components/common/EmptyState.vue";
+import { Cpu, Fan, Monitor, Palette, Thermometer } from "lucide-vue-next";
 import { useThermalStore } from "@/stores/thermal";
 import { useTranslate } from "@/i18n";
 
 const devices = useDevicesStore();
-const daemon = useDaemonStore();
 const thermal = useThermalStore();
 const t = useTranslate();
 
@@ -42,9 +41,6 @@ function switchErrorText(error: DisplaySwitchError): string {
   return "message" in error ? error.message : t("devices.page.switchTimeout", { name: error.timedOutDevice });
 }
 
-async function refresh() {
-  await daemon.refresh();
-}
 </script>
 
 <template>
@@ -87,12 +83,7 @@ async function refresh() {
       </div>
     </div>
 
-    <div v-if="empty" class="card empty-state">
-      <PlugZap :size="48" :stroke-width="1.4" />
-      <div class="empty-title">{{ t("devices.page.noDevicesFound") }}</div>
-      <div class="empty-sub">{{ t("devices.page.daemonRunning") }}</div>
-      <n-button secondary @click="refresh">{{ t("common.retry") }}</n-button>
-    </div>
+    <EmptyState v-if="empty" kind="devices" />
 
     <template v-else>
       <h2 class="section-title list-title">{{ t("devices.hero.hardware") }}</h2>
@@ -258,24 +249,5 @@ async function refresh() {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
   gap: var(--space-4);
-}
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-8);
-  color: var(--md-on-surface-variant);
-}
-.empty-title {
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  color: var(--md-on-surface);
-  margin-top: var(--space-2);
-}
-.empty-sub {
-  font-size: var(--font-size-sm);
-  margin-bottom: var(--space-2);
 }
 </style>
