@@ -11,6 +11,7 @@ import RgbDeviceCard from "@/components/rgb/RgbDeviceCard.vue";
 import RgbSyncEditor from "@/components/rgb/RgbSyncEditor.vue";
 import OpenRgbOptions from "@/components/rgb/OpenRgbOptions.vue";
 import StatusDot from "@/components/common/StatusDot.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import { motherboardSyncEnabled, quickSyncControls } from "@/components/rgb/syncSettings";
 import { useTranslate } from "@/i18n";
 import { backendText } from "@/utils/backendText";
@@ -183,9 +184,7 @@ function capSummary(cap: RgbDeviceCapabilities): string {
         :cap="selectedCap"
         :label="defaultLabel(selectedCap)"
       />
-      <div v-else class="card detail empty muted">
-        {{ daemon.connected ? t("rgb.page.noRgbCapableDevices") : t("rgb.page.waitingForDaemon") }}
-      </div>
+      <EmptyState v-else class="detail" kind="rgb" />
     </div>
   </div>
 </template>
@@ -367,10 +366,6 @@ function capSummary(cap: RgbDeviceCapabilities): string {
   gap: var(--space-2);
   margin: var(--space-2) 0 0;
   font-size: var(--font-size-sm);
-}
-.empty {
-  padding: var(--space-6);
-  text-align: center;
 }
 @media (max-width: 760px) {
   .layout {

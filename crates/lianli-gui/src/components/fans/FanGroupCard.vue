@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { ChevronDown, ChevronRight, Fan } from "lucide-vue-next";
+import { ChevronDown, ChevronRight, Fan, Info } from "lucide-vue-next";
 import type { DeviceInfo, FanGroup, FanSpeed, PwmHeader } from "@/types";
 import { MB_SYNC_KEY, MB_SYNC_PREFIX } from "@/types";
 import { decodeSpeedMode, fillSlots, isMbSyncGroup, speedModeOf } from "./speedMode";
 import { useConfigStore } from "@/stores/config";
 import { useDevicesStore } from "@/stores/devices";
+import { useDaemonStore } from "@/stores/daemon";
 import { useDeviceNamesStore } from "@/stores/deviceNames";
 import { useThemeStore } from "@/stores/theme";
 import NumberField from "@/components/common/NumberField.vue";
@@ -26,6 +27,7 @@ const t = useTranslate();
 const expanded = ref(true);
 
 const devices = useDevicesStore();
+const daemon = useDaemonStore();
 const names = useDeviceNamesStore();
 
 const title = computed(() =>
@@ -171,16 +173,26 @@ const kindOptions = computed(() => [
     value: "curve" as const,
     label: t("fans.groupCard.modeCurve"),
     disabled: !props.curveNames.length,
-    title: props.curveNames.length ? undefined : t("fans.groupCard.noCurves"),
+    title: props.curveNames.length ? undefined : t("fans.groupCard.curveUnavailable"),
   },
   { value: "fixed" as const, label: t("fans.groupCard.modeFixed") },
   {
     value: "mb" as const,
     label: t("fans.groupCard.modeMbSync"),
-    disabled: !props.device.mb_sync_support && !props.pwmHeaders.length,
+    disabled: !mbAvailable.value,
+    title: mbAvailable.value ? undefined : t("fans.groupCard.mbUnavailable"),
   },
   { value: "off" as const, label: t("common.off") },
 ]);
+
+const mbAvailable = computed(() => props.device.mb_sync_support || props.pwmHeaders.length > 0);
+
+const failingCurves = computed(() => new Set(daemon.connected ? devices.failingCurves : []));
+
+function slotCurveFailing(slot: number): boolean {
+  const mode = modeOf(slot);
+  return mode.startsWith("curve:") && failingCurves.value.has(mode.slice("curve:".length));
+}
 
 function kindValue(kind: ModeKind, slot: number): string {
   if (kind === "curve") {
@@ -226,10 +238,15 @@ function onAllKind(kind: ModeKind) {
       </div>
     </div>
 
+    <p v-if="!mbAvailable" class="unavailable-note">
+      <Info :size="16" :stroke-width="2.2" aria-hidden="true" />
+      <span>{{ t("fans.groupCard.mbUnavailable") }}</span>
+    </p>
+
     <div v-if="expanded" class="slots">
       <div v-for="slot in visibleSlots" :key="slot - 1" class="slot">
         <div class="slot-id">
-          <span class="slot-icon" :class="`kind-${kindOf(modeOf(slot - 1))}`"><Fan :size="20" /></span>
+          <span class="slot-icon" :class="slotCurveFailing(slot - 1) ? 'kind-failing' : `kind-${kindOf(modeOf(slot - 1))}`"><Fan :size="20" /></span>
           <span class="slot-text">
             <span class="slot-label">{{ slotLabel(slot) }}</span>
             <span class="mono rpm" :title="t('fans.groupCard.fanSpeedTooltip', { index: slot })">
@@ -271,10 +288,13 @@ function onAllKind(kind: ModeKind) {
               class="chip"
               :class="{ selected: modeOf(slot - 1) === `curve:${name}` }"
               :aria-pressed="modeOf(slot - 1) === `curve:${name}`"
+              :title="failingCurves.has(name) ? t('fans.sensorLost.chipTitle') : undefined"
               @click="onMode(slot - 1, `curve:${name}`)"
             >
+              <span v-if="failingCurves.has(name)" class="warn-dot" aria-hidden="true" />
               {{ name }}
             </button>
+            <span v-if="slotCurveFailing(slot - 1)" class="failing-text">{{ t("fans.sensorLost.slot") }}</span>
           </div>
           <span v-else-if="modeOf(slot - 1) === MB_SYNC_KEY" class="detail-text">
             {{ device.mb_sync_support ? t("fans.groupCard.mbFollowing") : t("fans.groupCard.mbFollowingSource") }}
@@ -402,6 +422,27 @@ function onAllKind(kind: ModeKind) {
   background: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
 }
+.slot-icon.kind-failing {
+  background: color-mix(in srgb, var(--warning) 18%, var(--md-surface-container-high));
+  color: var(--warning);
+}
+.unavailable-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 14px;
+  background: var(--md-surface-container-high);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--md-on-surface-variant);
+}
+.unavailable-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--md-primary);
+}
 .slot-text {
   display: flex;
   flex-direction: column;
@@ -459,6 +500,24 @@ function onAllKind(kind: ModeKind) {
 .chip:hover:not(.selected) {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
   color: var(--md-on-surface);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.warn-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.failing-text {
+  align-self: center;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--warning);
 }
 .chip.selected {
   border-color: var(--md-primary-container);

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useDialog } from "naive-ui";
-import { Plus, X } from "lucide-vue-next";
+import { Plus, TriangleAlert, X } from "lucide-vue-next";
 import { useConfigStore } from "@/stores/config";
 import { useDevicesStore } from "@/stores/devices";
+import { useDaemonStore } from "@/stores/daemon";
 import { useDeviceNamesStore } from "@/stores/deviceNames";
 import FanCurveEditor from "@/components/fans/FanCurveEditor.vue";
 import CurvePointsEditor from "@/components/fans/CurvePointsEditor.vue";
 import FanGroupCard from "@/components/fans/FanGroupCard.vue";
 import SensorSelect from "@/components/common/SensorSelect.vue";
 import SegmentedControl from "@/components/common/SegmentedControl.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import type { SensorSource, DeviceInfo } from "@/types";
 import { MB_SYNC_KEY } from "@/types";
 import { enumerateSensorsAsOptions } from "@/stores/sensorOptions";
@@ -19,6 +21,7 @@ import { speedAt } from "@/components/fans/curvePoints";
 
 const config = useConfigStore();
 const devices = useDevicesStore();
+const daemon = useDaemonStore();
 const names = useDeviceNamesStore();
 const dialog = useDialog();
 const t = useTranslate();
@@ -119,6 +122,12 @@ function onAllFansKind(kind: ModeKind) {
     return;
   }
   applyToAllFans(kind === "fixed" ? "constant" : "off");
+}
+
+const lostCurves = computed(() => (daemon.connected ? devices.failingCurves : []));
+
+function curveIndex(name: string): number {
+  return curves.value.findIndex((curve) => curve.name === name);
 }
 
 const liveReading = computed(() => (current.value ? devices.curveTemperature(current.value.name) : null));
@@ -281,6 +290,17 @@ function onHysteresisPwm(percent: number | null) {
 
 <template>
   <div class="page fans-page">
+    <div v-for="name in lostCurves" :key="name" class="sensor-lost" role="alert">
+      <TriangleAlert :size="20" :stroke-width="2.2" aria-hidden="true" />
+      <span class="sensor-lost-text">
+        <strong>{{ t("fans.sensorLost.title", { name }) }}</strong>
+        {{ t("fans.sensorLost.body") }}
+      </span>
+      <n-button v-if="curveIndex(name) >= 0" text type="primary" @click="selectedCurve = curveIndex(name)">
+        {{ t("fans.sensorLost.check") }}
+      </n-button>
+    </div>
+
     <!-- Section 1: Fan curves -->
     <section class="card section">
       <div class="section-head">
@@ -297,7 +317,10 @@ function onHysteresisPwm(percent: number | null) {
           :class="{ active: i === selectedCurve }"
           :title="c.name"
         >
-          <span class="curve-tab-name" @click="selectedCurve = i">{{ c.name }}</span>
+          <span class="curve-tab-name" @click="selectedCurve = i">
+            <span v-if="lostCurves.includes(c.name)" class="warn-dot" role="img" :aria-label="t('fans.sensorLost.chipTitle')" :title="t('fans.sensorLost.chipTitle')" />
+            {{ c.name }}
+          </span>
           <button
             class="curve-tab-del"
             :title="t('fans.page.deleteCurve')"
@@ -402,7 +425,7 @@ function onHysteresisPwm(percent: number | null) {
           :pwm-headers="config.pwmHeaders"
         />
       </div>
-      <div v-else class="empty muted">{{ t("fans.page.noFanDevices") }}</div>
+      <EmptyState v-else kind="fans" compact />
     </section>
 
     <section class="card settings-row">
@@ -484,6 +507,33 @@ function onHysteresisPwm(percent: number | null) {
   font-weight: 500;
   max-width: 220px;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.sensor-lost {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--warning) 16%, var(--md-surface-container-low));
+  color: var(--md-on-surface);
+}
+.sensor-lost > svg {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+.sensor-lost-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.warn-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--warning);
+  vertical-align: middle;
 }
 .curve-tab-name {
   overflow: hidden;

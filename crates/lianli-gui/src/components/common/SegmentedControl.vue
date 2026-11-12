@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string">
-import { Check } from "lucide-vue-next";
+import { Check, Info } from "lucide-vue-next";
 
 defineProps<{
   modelValue: T | null;
@@ -14,19 +14,22 @@ const emit = defineEmits<{ "update:modelValue": [value: T] }>();
 
 <template>
   <div class="segmented" :class="size ?? 'medium'" role="group" :aria-label="label">
+    <!-- Unavailable options stay focusable so their reason can be read on hover or focus. -->
     <button
       v-for="option in options"
       :key="option.value"
       type="button"
       class="segment"
-      :class="{ selected: option.value === modelValue }"
+      :class="{ selected: option.value === modelValue, unavailable: option.disabled, explained: option.disabled && option.title }"
       :aria-pressed="option.value === modelValue"
-      :disabled="disabled || option.disabled"
+      :aria-disabled="option.disabled || undefined"
+      :disabled="disabled"
       :title="option.title"
-      @click="emit('update:modelValue', option.value)"
+      @click="option.disabled || emit('update:modelValue', option.value)"
     >
       <Check v-if="option.value === modelValue" :size="size === 'small' ? 13 : 15" :stroke-width="2.6" />
       <span>{{ option.label }}</span>
+      <Info v-if="option.disabled && option.title" class="reason-icon" :size="size === 'small' ? 13 : 14" :stroke-width="2.2" />
     </button>
   </div>
 </template>
@@ -65,7 +68,7 @@ const emit = defineEmits<{ "update:modelValue": [value: T] }>();
 .segment + .segment {
   border-left: 1px solid var(--md-outline);
 }
-.segment:hover:not(:disabled):not(.selected) {
+.segment:hover:not(:disabled):not(.selected):not(.unavailable) {
   background: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
   color: var(--md-on-surface);
 }
@@ -77,8 +80,21 @@ const emit = defineEmits<{ "update:modelValue": [value: T] }>();
   background: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
 }
+.segment:disabled,
+.segment.unavailable {
+  cursor: not-allowed;
+}
+.segment:disabled > span,
+.segment.unavailable > span {
+  opacity: 0.45;
+}
+.segment.explained {
+  cursor: help;
+}
+.reason-icon {
+  opacity: 0.7;
+}
 .segment:disabled {
   opacity: 0.45;
-  cursor: not-allowed;
 }
 </style>

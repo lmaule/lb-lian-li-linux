@@ -200,6 +200,13 @@ export const useDevicesStore = defineStore("devices", () => {
     return telemetry.value.curve_temperatures?.[curveName] ?? null;
   }
 
+  const failingCurves = computed(() =>
+    Object.entries(telemetry.value.curve_temperatures ?? {})
+      .filter(([, reading]) => reading.full_speed_fallback)
+      .map(([name]) => name)
+      .sort(),
+  );
+
   function applyPoll(devices: DeviceInfo[], snap: TelemetrySnapshot) {
     for (const [id, source] of Object.entries(displaySwitches.value)) {
       if (displaySwitchComplete(source, devices)) finishDisplaySwitch(id);
@@ -227,6 +234,7 @@ export const useDevicesStore = defineStore("devices", () => {
     fanRpms,
     coolantTemp,
     curveTemperature,
+    failingCurves,
     applyPoll,
   };
 });
