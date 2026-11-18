@@ -5,6 +5,7 @@ import { computed, reactive, ref } from "vue";
 import { useIpc } from "@/composables/useIpc";
 import { tr } from "@/i18n";
 import { router } from "@/router";
+import { isSpeedModeKey } from "@/components/fans/speedMode";
 import type {
   AppConfig,
   LcdTemplate,
@@ -13,6 +14,7 @@ import type {
   SensorInfo,
   LcdConfig,
   FanCurve,
+  FanSpeed,
   PwmHeader,
 } from "@/types";
 
@@ -34,6 +36,7 @@ function defaultConfig(): AppConfig {
     },
     rgb_drift_detection_enabled: true,
     rgb_drift_detection_interval_ms: 1000,
+    h264_disabled: [],
   };
 }
 
@@ -60,8 +63,10 @@ export const useConfigStore = defineStore("config", () => {
   const imported = ref<{ instance: string; originals: LcdTemplate[]; copies: LcdTemplate[] } | null>(null);
   const presets = ref<RgbPreset[]>([]);
   const pwmHeaders = ref<PwmHeader[]>([]);
+  let editRevision = 0;
 
   function markDirty() {
+    editRevision++;
     dirty.value = true;
     const page = router.currentRoute.value.name;
     if (typeof page === "string" && !dirtyPages.value.includes(page)) {
@@ -79,7 +84,16 @@ export const useConfigStore = defineStore("config", () => {
     imported.value = null;
   }
 
-  async function load() {
+  function adoptRgbDevice(saved: AppConfig, deviceId: string) {
+    const fresh = saved.rgb?.devices.find((d) => d.device_id === deviceId);
+    const rgb = ensureRgb();
+    const index = rgb.devices.findIndex((d) => d.device_id === deviceId);
+    if (fresh && index >= 0) rgb.devices[index] = structuredClone(fresh);
+    else if (fresh) rgb.devices.push(structuredClone(fresh));
+    else if (index >= 0) rgb.devices.splice(index, 1);
+  }
+
+  async function load(options: { keepDraft?: boolean; rgbDevice?: string } = {}) {
     const [cfg, caps, sens, tpls, pres, pwm] = await Promise.all([
       ipc.request<AppConfig | null>("GetConfig").catch(() => null),
       ipc.request<RgbDeviceCapabilities[]>("GetRgbCapabilities").catch(() => []),
@@ -88,7 +102,8 @@ export const useConfigStore = defineStore("config", () => {
       ipc.request<RgbPreset[]>("ListRgbPresets").catch(() => []),
       ipc.request<PwmHeader[]>("ListPwmHeaders").catch(() => []),
     ]);
-    if (cfg) replace(cfg);
+    if (cfg && !(options.keepDraft && dirty.value)) replace(cfg);
+    else if (cfg && options.rgbDevice) adoptRgbDevice(cfg, options.rgbDevice);
     rgbCaps.value = caps ?? [];
     sensors.value = sens ?? [];
     templates.value = tpls ?? [];
@@ -104,7 +119,8 @@ export const useConfigStore = defineStore("config", () => {
     templates.value = [...current.filter((item) => !ids.has(item.id)), ...JSON.parse(JSON.stringify(copies))];
   }
 
-  async function save() {
+  /** Resolves true when the draft is clean afterwards; false when edits arrived while saving. */
+  async function save(): Promise<boolean> {
     // Flush any pending debounced effect requests first.
     await Promise.all([...flushRegistry].map((fn) => fn()));
     const staged = imported.value;
@@ -119,15 +135,22 @@ export const useConfigStore = defineStore("config", () => {
       staged.originals = JSON.parse(JSON.stringify(staged.copies));
       await emit(LCD_TEMPLATES_CHANGED_EVENT);
     }
+    const sentRevision = editRevision;
+    const payload: AppConfig = JSON.parse(JSON.stringify(config));
     try {
-      await ipc.request("SetConfig", { config }, staged?.instance);
+      await ipc.request("SetConfig", { config: payload }, staged?.instance);
     } catch (error) {
       if (staged?.copies.length) throw new Error(tr("shell.config.lcdNotConfirmed", { error: String(error) }));
       throw error;
     }
+    if (sentRevision !== editRevision) {
+      savedLcds.value = payload.lcds;
+      return false;
+    }
     dirty.value = false;
     dirtyPages.value = [];
-    await load();
+    await load({ keepDraft: true });
+    return !dirty.value;
   }
 
   function stageImportedMedia(lcds: LcdConfig[], copies: LcdTemplate[], instance: string) {
@@ -203,6 +226,41 @@ export const useConfigStore = defineStore("config", () => {
     return config.fan_curves.map((c) => c.name);
   }
 
+  function fanCurveNameShared(curve: FanCurve): boolean {
+    return config.fan_curves.some((c) => c !== curve && c.name === curve.name);
+  }
+
+  // The daemon keys curves by name, so the last curve with a given name is the one that runs.
+  function fanCurveRuns(curve: FanCurve): boolean {
+    const sameName = config.fan_curves.filter((c) => c.name === curve.name);
+    return sameName[sameName.length - 1] === curve;
+  }
+
+  // Every fan and AIO slot naming the curve, active or not. A shared name falls back to the other copy.
+  function fanCurveReferenced(curve: FanCurve): boolean {
+    if (isSpeedModeKey(curve.name) || fanCurveNameShared(curve)) return false;
+    const named = (speed: FanSpeed) => speed === curve.name;
+    return (config.fans?.speeds ?? []).some((group) => group.speeds.some(named))
+      || Object.values(config.aio).some((aio) => named(aio.pump_target_rpm) || aio.fan_speeds.some(named));
+  }
+
+  function renameFanCurve(curve: FanCurve, name: string) {
+    const previous = curve.name;
+    if (previous === name) return;
+    if (!isSpeedModeKey(previous) && fanCurveRuns(curve)) {
+      const follow = (speed: FanSpeed) => (speed === previous ? name : speed);
+      for (const group of config.fans?.speeds ?? []) {
+        if (group.speeds.includes(previous)) group.speeds = group.speeds.map(follow);
+      }
+      for (const aio of Object.values(config.aio)) {
+        if (aio.pump_target_rpm === previous) aio.pump_target_rpm = name;
+        if (aio.fan_speeds.includes(previous)) aio.fan_speeds = aio.fan_speeds.map(follow);
+      }
+    }
+    curve.name = name;
+    markDirty();
+  }
+
   function addLcd(entry: LcdConfig) {
     config.lcds.push(entry);
     markDirty();
@@ -243,6 +301,10 @@ export const useConfigStore = defineStore("config", () => {
     presetsFor,
     aioConfigFor,
     curveNames,
+    fanCurveNameShared,
+    fanCurveRuns,
+    fanCurveReferenced,
+    renameFanCurve,
     addLcd,
     addFanCurve,
   };

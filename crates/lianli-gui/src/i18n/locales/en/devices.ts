@@ -3,7 +3,6 @@ export default {
     switchTimeout: "{name}: the daemon did not detect the panel in its new mode. Check the daemon log for USB hotplug warnings before retrying.",
   },
   hero: {
-    eyebrow: "Overview",
     connected: "Connected devices",
     cpu: "CPU",
     gpu: "GPU",
@@ -48,6 +47,10 @@ export default {
     takeOverTitle: "Take over this device?",
     takeOverContent: "It currently belongs to another controller. Taking it over will disconnect it from that PC.",
     pingFailed: "Ping failed",
+    useH264: "Use H.264",
+    useH264Hint: "Turn off to send JPEG frames instead. JPEG can look sharper on some panels but uses more USB bandwidth.",
+    h264OffHint: "H.264 is off. This screen receives JPEG frames, which can look sharper but use more USB bandwidth.",
+    h264Required: "This panel does not accept JPEG frames in desktop mode, so it always uses H.264.",
     status: {
       switching: "Switching…",
       binding: "Binding…",
@@ -68,6 +71,7 @@ export default {
     range: "{min} – {max}",
     summary: "{label} over the last 5 minutes, from {min} to {max}",
     collecting: "Collecting readings…",
+    noReading: "No current reading",
   },
   aio: {
     fan: "Fan {index}",
