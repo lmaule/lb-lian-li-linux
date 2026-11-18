@@ -13,12 +13,21 @@ import FanGroupCard from "@/components/fans/FanGroupCard.vue";
 import SensorSelect from "@/components/common/SensorSelect.vue";
 import SegmentedControl from "@/components/common/SegmentedControl.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
-import type { SensorSource, DeviceInfo } from "@/types";
+import type { SensorSource, DeviceInfo, FanGroup } from "@/types";
 import { MB_SYNC_KEY } from "@/types";
 import { enumerateSensorsAsOptions } from "@/stores/sensorOptions";
-import { useTranslate } from "@/i18n";
-import { decodeSpeedMode, fillSlots, isReservedCurveName, speedModeOf } from "@/components/fans/speedMode";
-import { speedAt } from "@/components/fans/curvePoints";
+import { useTranslate, type MessageKey } from "@/i18n";
+import {
+  decodeSpeedMode,
+  effectiveCurveSource,
+  fillSlots,
+  groupRunsCurves,
+  isReservedCurveName,
+  isSpeedModeKey,
+  sameSensorSource,
+  speedModeOf,
+} from "@/components/fans/speedMode";
+import { MAX_CURVE_NAME_CHARS, speedAt } from "@/components/fans/curvePoints";
 import { CURVE_TEMPLATES } from "@/components/fans/curveTemplates";
 import { useCurveHistory } from "@/components/fans/useCurveHistory";
 
@@ -134,10 +143,17 @@ function curveIndex(name: string): number {
   return curves.value.findIndex((curve) => curve.name === name);
 }
 
-const liveReading = computed(() => (current.value ? devices.curveTemperature(current.value.name) : null));
+// A reading belongs to the applied curve, so it is shown only while that curve reads the drafted sensor.
+const appliedReading = computed(() => (daemon.connected && current.value ? devices.curveTemperature(current.value.name) : null));
+const sourceChanged = computed(() => {
+  const source = appliedReading.value?.source;
+  return !!source && !!current.value && !sameSensorSource(source, effectiveCurveSource(current.value));
+});
+const liveReading = computed(() => (appliedReading.value?.source && !sourceChanged.value ? appliedReading.value : null));
 
 const liveState = computed(() => {
   const reading = liveReading.value;
+  if (sourceChanged.value) return { kind: "idle", text: t("fans.live.sourceChanged"), tone: "" };
   if (!reading || !current.value) return { kind: "idle", text: t("fans.live.notInUse"), tone: "" };
   if (reading.full_speed_fallback || reading.celsius === null) {
     return { kind: "fallback", text: t("fans.live.fallback"), tone: "" };
@@ -168,27 +184,33 @@ function applyToAllFans(value: string) {
 }
 
 const fanLabels = computed(() => devices.labels);
-const curveUsers = computed(() => {
-  const name = current.value?.name;
-  if (!name) return [];
+function curveSlotCount(group: FanGroup, name: string): number {
+  if (isSpeedModeKey(name) || !groupRunsCurves(group)) return 0;
+  const device = group.device_id ? devices.byId(group.device_id) : undefined;
+  const slots = device ? group.speeds.slice(0, device.fan_count ?? 1) : group.speeds;
+  return slots.filter((speed) => speed === name).length;
+}
+
+function fanGroupUsers(name: string): string[] {
   return fanCfg.value.speeds.flatMap((group) => {
-    const device = group.device_id ? devices.byId(group.device_id) : undefined;
-    const slots = device ? group.speeds.slice(0, device.fan_count ?? 1) : group.speeds;
-    const count = slots.filter((speed) => speed === name).length;
+    const count = curveSlotCount(group, name);
     if (!count) return [];
+    const device = group.device_id ? devices.byId(group.device_id) : undefined;
     if (!device) return [t("fans.page.curveUserOffline", { device: group.device_id ?? t("fans.page.unknownDevice") })];
     const label = names.label(device.device_id, fanLabels.value.get(device.device_id) ?? device.name);
     return [t(count === 1 ? "fans.page.curveUserOneFan" : "fans.page.curveUserFans", { label, count })];
   });
-});
+}
+
+const curveUsers = computed(() => (current.value?.name && config.fanCurveRuns(current.value) ? fanGroupUsers(current.value.name) : []));
 
 const sensorOptions = computed(() => enumerateSensorsAsOptions(config.sensors, true, true));
 
 const history = useCurveHistory(() => curves.value, () => config.markDirty());
 
-function onCurveChange(value: [number, number][]) {
+function onCurveChange(value: [number, number][], gesture: number | null) {
   if (!current.value) return;
-  history.record(current.value, current.value.curve, value);
+  history.record(current.value, current.value.curve, value, gesture);
   current.value.curve = value;
   config.markDirty();
 }
@@ -250,13 +272,20 @@ async function importCurves() {
   } finally {
     fileBusy.value = false;
   }
-  if (!found.length) return;
+  if (found.length) confirmImport(found);
+}
+
+function planImport(found: PortableCurve[]) {
   const taken = curves.value.map((c) => c.name);
-  const planned = found.map((curve) => {
+  return found.map((curve) => {
     const name = uniqueName(curve.name, taken);
     taken.push(name);
     return { name, original: curve.name, curve: curve.curve };
   });
+}
+
+function confirmImport(found: PortableCurve[]) {
+  const planned = planImport(found);
   dialog.info({
     title: t("fans.curveFiles.confirmTitle"),
     content: () =>
@@ -277,6 +306,10 @@ async function importCurves() {
     positiveText: t("fans.curveFiles.importConfirm"),
     negativeText: t("common.cancel"),
     onPositiveClick: () => {
+      if (planImport(found).some((item, i) => item.name !== planned[i].name)) {
+        confirmImport(found);
+        return;
+      }
       const first = curves.value.length;
       for (const item of planned) {
         config.addFanCurve({ name: item.name, temp_source: null, temp_command: "", curve: item.curve });
@@ -315,9 +348,12 @@ function addCurveFrom(baseName: string, points: [number, number][]) {
 }
 
 function removeCurve(idx: number) {
+  const curve = curves.value[idx];
+  if (!curve) return;
+  const name = curve.name || t("fans.page.curveFallbackName");
   dialog.error({
     title: t("fans.page.deleteCurveTitle"),
-    content: t("fans.page.deleteCurveContent", { name: curves.value[idx]?.name ?? t("fans.page.curveFallbackName") }),
+    content: t(config.fanCurveReferenced(curve) ? "fans.page.deleteCurveInUseContent" : "fans.page.deleteCurveContent", { name }),
     positiveText: t("common.delete"),
     negativeText: t("common.cancel"),
     onPositiveClick: () => {
@@ -331,18 +367,36 @@ function removeCurve(idx: number) {
   });
 }
 
-function renameCurve(name: string) {
+function curveNameError(name: string): MessageKey | null {
+  if (!name) return "fans.page.curveNameEmpty";
+  if (isReservedCurveName(name)) return "fans.page.curveNameReserved";
+  if ([...name].length > MAX_CURVE_NAME_CHARS) return "fans.page.curveNameTooLong";
+  if (curves.value.some((c) => c !== current.value && c.name === name)) return "fans.page.curveNameTaken";
+  return null;
+}
+
+function isUnchangedName(input: string): boolean {
+  const saved = current.value?.name;
+  return input === saved || input.trim() === saved;
+}
+
+const nameError = computed(() => (isUnchangedName(nameBuffer.value) ? null : curveNameError(nameBuffer.value.trim())));
+
+function renameCurve(input: string) {
   if (!current.value) return;
-  const trimmed = name.trim();
-  if (trimmed === current.value.name) return;
-  if (!trimmed || isReservedCurveName(trimmed)) {
-    message.error(t(trimmed ? "fans.page.reservedCurveName" : "fans.page.emptyCurveName", { name: trimmed }));
+  if (isUnchangedName(input)) {
     nameBuffer.value = current.value.name;
     return;
   }
-  current.value.name = trimmed;
-  nameBuffer.value = trimmed;
-  config.markDirty();
+  const name = input.trim();
+  const error = curveNameError(name);
+  if (error) {
+    message.warning(t(error, { name, max: MAX_CURVE_NAME_CHARS }));
+    nameBuffer.value = current.value.name;
+    return;
+  }
+  nameBuffer.value = name;
+  config.renameFanCurve(current.value, name);
 }
 
 function onTempSource(value: string) {
@@ -365,19 +419,23 @@ function onTempCommand(value: string) {
 }
 
 const tempSourceValue = computed(() => {
-  if (!current.value?.temp_source) return "";
+  if (!current.value) return "";
   const s = current.value.temp_source;
-  if (s.type === "command") return current.value.temp_command ? "command" : "";
+  if (!s) return current.value.temp_command ? "command" : "";
+  if (s.type === "command") return "command";
   return encodeSensorOption(s);
 });
 
 function uniqueName(base: string, taken: string[]): string {
-  if (!taken.includes(base)) return base;
+  const fit = (suffix: string) =>
+    [...base].slice(0, MAX_CURVE_NAME_CHARS - suffix.length).join("").trimEnd() + suffix;
+  const plain = fit("");
+  if (!taken.includes(plain)) return plain;
   for (let i = 2; i < 1000; i++) {
-    const c = `${base} ${i}`;
+    const c = fit(` ${i}`);
     if (!taken.includes(c)) return c;
   }
-  return base;
+  return plain;
 }
 
 function encodeSensorOption(s: SensorSource): string {
@@ -489,7 +547,10 @@ function onHysteresisPwm(percent: number | null) {
         <div class="curve-side">
           <div class="now" :class="liveState.kind === 'reading' ? `tone-${liveState.tone}` : liveState.kind">
             <span class="now-label">{{ t("fans.live.rightNow") }}</span>
-            <span v-if="liveState.kind === 'reading'" class="now-value">{{ liveState.text }}</span>
+            <template v-if="liveState.kind === 'reading'">
+              <span class="now-value">{{ liveState.text }}</span>
+              <span class="now-text">{{ t("fans.live.estimate") }}</span>
+            </template>
             <span v-else class="now-text">{{ liveState.text }}</span>
           </div>
           <div class="field">
@@ -497,6 +558,7 @@ function onHysteresisPwm(percent: number | null) {
             <n-input
               size="small"
               v-model:value="nameBuffer"
+              :status="nameError ? 'error' : undefined"
               @blur="renameCurve(nameBuffer)"
               :placeholder="t('fans.page.curveNamePlaceholder')"
             />
@@ -862,7 +924,12 @@ function onHysteresisPwm(percent: number | null) {
   margin: 0 var(--space-2) 6px 0;
 }
 .settings-row .field {
-  width: 150px;
+  width: 170px;
+}
+.settings-row .field label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .empty {
   padding: var(--space-4);

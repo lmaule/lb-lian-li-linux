@@ -85,6 +85,12 @@ export interface DeviceInfo {
   supports_c_command?: boolean;
   port_index?: [number, number] | null;
   wireless_group_mac?: string | null;
+  h264?: H264Setting | null;
+}
+
+export interface H264Setting {
+  key: string;
+  jpeg_available: boolean;
 }
 
 export interface OpenRgbServerStatus {
@@ -147,6 +153,7 @@ export type WirelessDongle = "transmitter" | "receiver";
 export interface CurveTemperature {
   celsius: number | null;
   full_speed_fallback: boolean;
+  source?: SensorSource | null;
 }
 
 export interface DesktopStreamStatus {
@@ -410,6 +417,17 @@ export interface RgbDeviceConfig {
   effect_memory?: RgbEffectMemory[];
 }
 
+export type RgbPreviewShape = "fan" | "pump" | "screen" | "strip";
+
+export interface RgbPreview {
+  elements: { shape: RgbPreviewShape; aspect: number }[];
+  leds: { element: number; x: number; y: number }[];
+  frames: string;
+  frame_count: number;
+  interval_ms: number;
+  fidelity: "exact" | "approximate";
+}
+
 export type RgbSyncKind = "Continuous" | "Matched";
 
 export interface MergeLightingConfig {
@@ -542,6 +560,7 @@ export interface AppConfig {
   thermal_alert: ThermalAlertSettings;
   rgb_drift_detection_enabled: boolean;
   rgb_drift_detection_interval_ms: number;
+  h264_disabled: string[];
 }
 
 // ─── Templates ───────────────────────────────────────────────────────────────
@@ -575,7 +594,8 @@ export interface Widget {
 
 export type TemplateBackground =
   | { type: "color"; rgb: RGBA }
-  | { type: "image"; path: string };
+  | { type: "image"; path: string }
+  | { type: "video"; path: string; fps?: number | null };
 
 export interface LcdTemplate {
   id: string;
@@ -621,6 +641,8 @@ export interface CatalogTemplate {
   base_height?: number;
   rotated?: boolean;
   files?: CatalogFile[];
+  group?: string;
+  variant?: string;
 }
 
 export interface CatalogManifest {

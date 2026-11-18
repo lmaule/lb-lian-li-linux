@@ -5,6 +5,8 @@ import { Copy, Save, X } from "lucide-vue-next";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { pickMediaFile } from "@/utils/mediaPicker";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import type { UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "@/utils/backendText";
 import type { LcdTemplate, Widget, Widget as W, RGBA, RGB, SensorSourceConfig } from "@/types";
 import { useConfigStore } from "@/stores/config";
 import { useLcdStore } from "@/stores/lcd";
@@ -70,6 +72,7 @@ function loadRequestedTemplate(id: string | (string | null)[] | null) {
   const tid = Array.isArray(id) ? id[0] : id;
   const match = tid ? config.templates.find((t) => t.id === tid) : undefined;
   template.value = match ? (JSON.parse(JSON.stringify(match)) as LcdTemplate) : blankTemplate();
+  savedSnapshot.value = JSON.stringify(template.value);
   if (template.value.background.type === "color") {
     lastBgColor.value = [...template.value.background.rgb] as RGBA;
   }
@@ -165,6 +168,7 @@ const bgType = computed(() => template.value?.background.type ?? "color");
 const backgroundOptions = computed(() => [
   { value: "color" as const, label: t("editor.window.backgroundColor") },
   { value: "image" as const, label: t("editor.window.backgroundImage") },
+  { value: "video" as const, label: t("editor.window.backgroundVideo") },
 ]);
 
 function onBgColor(v: RGB | RGBA) {
@@ -186,6 +190,18 @@ async function pickBgImage() {
     const selected = await pickMediaFile("image");
     if (selected && target && template.value === target) {
       target.background = { type: "image", path: selected };
+    }
+  } catch (error) {
+    setStatus(String(error), true);
+  }
+}
+
+async function pickBgVideo() {
+  const target = template.value;
+  try {
+    const selected = await pickMediaFile("video");
+    if (selected && target && template.value === target) {
+      target.background = { type: "video", path: selected, fps: null };
     }
   } catch (error) {
     setStatus(String(error), true);
@@ -424,11 +440,11 @@ async function onCopyJson() {
   }
 }
 
-async function onSave() {
-  if (!template.value) return;
+async function onSave(): Promise<boolean> {
+  if (!template.value) return false;
   if (!template.value.name.trim()) {
     setStatus(t("editor.window.nameEmpty"), true);
-    return;
+    return false;
   }
   if (
     config.templates.some(
@@ -436,19 +452,23 @@ async function onSave() {
     )
   ) {
     setStatus(t("editor.window.nameExists", { name: template.value.name }), true);
-    return;
+    return false;
   }
+  const snapshot = JSON.stringify(template.value);
   const idx = config.templates.findIndex((t) => t.id === template.value!.id);
   if (idx >= 0) {
-    config.templates[idx] = JSON.parse(JSON.stringify(template.value));
+    config.templates[idx] = JSON.parse(snapshot);
   } else {
-    config.templates.push(JSON.parse(JSON.stringify(template.value)));
+    config.templates.push(JSON.parse(snapshot));
   }
   try {
     await lcd.setTemplates(config.templates);
+    savedSnapshot.value = snapshot;
     setStatus(t("common.saved"), false);
+    return true;
   } catch (e) {
     setStatus(t("editor.window.saveFailed", { error: String(e) }), true);
+    return false;
   }
 }
 
@@ -465,6 +485,56 @@ async function closeWindow() {
     console.warn("close window failed", e);
   }
 }
+
+const savedSnapshot = ref("");
+const draftDirty = computed(() => template.value !== null && JSON.stringify(template.value) !== savedSnapshot.value);
+const pendingExit = ref<"close" | "quit" | null>(null);
+const exiting = ref(false);
+
+watch(draftDirty, (dirty) => void invoke("set_editor_draft", { dirty }).catch(() => undefined));
+
+async function leave(kind: "close" | "quit") {
+  if (kind === "quit") await invoke("quit_app", { force: true });
+  else await getCurrentWebviewWindow().destroy();
+}
+
+async function confirmExit(save: boolean) {
+  const kind = pendingExit.value;
+  if (!kind || exiting.value) return;
+  exiting.value = true;
+  try {
+    if (save && !(await onSave())) return;
+    pendingExit.value = null;
+    await leave(kind);
+  } catch (e) {
+    setStatus(String(e), true);
+  } finally {
+    exiting.value = false;
+  }
+}
+
+let unlistenClose: UnlistenFn | undefined;
+let unlistenQuit: UnlistenFn | undefined;
+onMounted(async () => {
+  try {
+    const win = getCurrentWebviewWindow();
+    unlistenClose = await win.onCloseRequested((event) => {
+      if (!draftDirty.value) return;
+      event.preventDefault();
+      pendingExit.value = "close";
+    });
+    unlistenQuit = await win.listen("app://quit-requested", () => {
+      if (draftDirty.value) pendingExit.value = "quit";
+      else void leave("quit").catch(() => undefined);
+    });
+  } catch {
+    // Outside Tauri there is no window to guard.
+  }
+});
+onUnmounted(() => {
+  unlistenClose?.();
+  unlistenQuit?.();
+});
 
 const localName = ref("");
 watch(template, (t) => { localName.value = t?.name ?? ""; }, { immediate: true });
@@ -493,8 +563,8 @@ function commitName() {
           size="small"
           :model-value="bgType"
           :options="backgroundOptions"
-          :label="t('editor.window.backgroundColor')"
-          @update:model-value="(kind) => (kind === 'color' ? setBgColorMode() : pickBgImage())"
+          :label="t('editor.window.backgroundType')"
+          @update:model-value="(kind) => (kind === 'color' ? setBgColorMode() : kind === 'video' ? pickBgVideo() : pickBgImage())"
         />
         <ColorPicker
           v-if="bgType === 'color'"
@@ -503,7 +573,7 @@ function commitName() {
           :alpha="true"
           @update:model-value="onBgColor"
         />
-        <span v-else-if="template?.background.type === 'image'" class="bg-path mono" :title="template.background.path">
+        <span v-else-if="template?.background.type === 'image' || template?.background.type === 'video'" class="bg-path mono" :title="template.background.path">
           {{ template.background.path.split("/").pop() }}
         </span>
       </div>
@@ -551,6 +621,25 @@ function commitName() {
         />
       </div>
     </div>
+
+    <n-modal
+      :show="pendingExit !== null"
+      :mask-closable="false"
+      :close-on-esc="true"
+      @update:show="(show: boolean) => { if (!show) pendingExit = null; }"
+    >
+      <div class="exit-dialog" role="dialog" aria-modal="true" aria-labelledby="editor-exit-title">
+        <h2 id="editor-exit-title" class="exit-title">{{ t("editor.window.unsavedTitle") }}</h2>
+        <p class="exit-body">{{ t("editor.window.unsavedBody", { name: template?.name ?? "" }) }}</p>
+        <div class="exit-actions">
+          <n-button quaternary type="primary" :disabled="exiting" @click="pendingExit = null">{{ t("common.cancel") }}</n-button>
+          <n-button secondary :disabled="exiting" @click="confirmExit(false)">{{ t("shell.unsaved.closeDiscard") }}</n-button>
+          <n-button type="primary" :loading="exiting" :disabled="exiting" @click="confirmExit(true)">
+            {{ t("shell.unsaved.closeSave") }}
+          </n-button>
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
@@ -623,15 +712,15 @@ function commitName() {
   border-radius: 24px;
 }
 .left {
-  width: 260px;
+  flex: 0 1 260px;
+  min-width: 180px;
   padding: var(--space-3);
-  flex-shrink: 0;
   overflow: hidden;
   background: var(--md-surface-container-low);
 }
 .center {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 160px;
   padding: var(--space-4);
   background: var(--md-surface-container);
   display: flex;
@@ -640,10 +729,39 @@ function commitName() {
   overflow: hidden;
 }
 .right {
-  width: 340px;
+  flex: 0 1 340px;
+  min-width: 220px;
   padding: var(--space-4);
-  flex-shrink: 0;
   overflow: hidden;
   background: var(--md-surface-container-low);
+}
+.exit-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 24px;
+  border-radius: 28px;
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+.exit-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+.exit-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--md-on-surface-variant);
+}
+.exit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 </style>

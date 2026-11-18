@@ -1,7 +1,7 @@
 use super::ServiceManager;
 use lianli_devices::detect::{enumerate_devices, probe_tl_lcd_port_indices};
-use lianli_shared::device_id::DeviceFamily;
-use lianli_shared::ipc::DeviceInfo;
+use lianli_shared::device_id::{panel_key, DeviceFamily};
+use lianli_shared::ipc::{CurveTemperature, DeviceInfo, H264Setting};
 use lianli_shared::screen::screen_info_for;
 use lianli_shared::ui_message::{UiMessage, UiText};
 use std::collections::{HashMap, HashSet};
@@ -207,6 +207,7 @@ impl ServiceManager {
                 port_index,
                 wireless_group_mac,
                 topology_key: Some(det.topology_key()),
+                h264: None,
             });
         }
 
@@ -360,6 +361,7 @@ impl ServiceManager {
                 port_index: None,
                 wireless_group_mac: None,
                 topology_key: None,
+                h264: None,
             });
 
             // Update RPM telemetry keyed by device_id
@@ -444,6 +446,7 @@ impl ServiceManager {
                 port_index: None,
                 wireless_group_mac: None,
                 topology_key: None,
+                h264: None,
             });
         }
 
@@ -538,14 +541,25 @@ impl ServiceManager {
                 .cloned()
                 .filter_map(|d| retained_cache_entry(d, &opened_topos, &bound_mac_strs)),
         );
+        for device in &mut devices {
+            device.h264 = h264_setting(device, |key, pid| {
+                self.desktop_displays.h264_setting(key, pid)
+            });
+        }
 
         let desktop_streams = self.desktop_displays.statuses();
-        let curve_temperatures = self
-            .controllers
-            .fan
-            .as_ref()
-            .map(|fan| fan.curve_temperatures())
-            .unwrap_or_default();
+        let curve_temperatures = merge_curve_temperatures(
+            self.controllers
+                .fan
+                .as_ref()
+                .map(|fan| fan.curve_temperatures())
+                .unwrap_or_default(),
+            self.controllers
+                .aio
+                .as_ref()
+                .map(|aio| aio.curve_temperatures())
+                .unwrap_or_default(),
+        );
         {
             let mut ipc_state = self.ipc.state.lock();
             for (index, status) in &mut ipc_state.telemetry.media_preparation {
@@ -563,6 +577,52 @@ impl ServiceManager {
             ipc_state.devices = devices;
         }
     }
+}
+
+impl ServiceManager {
+    pub(super) fn respawn_pending_desktop_workers(&mut self) {
+        if !self.desktop_displays.restart_pending() {
+            return;
+        }
+        match crate::desktop_display::enumerate_turzx() {
+            Ok(present) => self.desktop_displays.sync(&present),
+            Err(error) => debug!("TURZX enumeration failed: {error:#}"),
+        }
+    }
+}
+
+fn h264_setting(
+    device: &DeviceInfo,
+    desktop: impl FnOnce(&str, u16) -> Option<bool>,
+) -> Option<H264Setting> {
+    if !device.has_lcd {
+        return None;
+    }
+    let key = device.topology_key.as_deref().and_then(panel_key)?;
+    let jpeg_available = if device.family.is_desktop_mode() {
+        desktop(&key, device.pid)?
+    } else {
+        screen_info_for(device.family)?.h264.then_some(true)?
+    };
+    Some(H264Setting {
+        key,
+        jpeg_available,
+    })
+}
+
+fn merge_curve_temperatures(
+    mut fans: HashMap<String, CurveTemperature>,
+    aio: HashMap<String, CurveTemperature>,
+) -> HashMap<String, CurveTemperature> {
+    for (name, reading) in aio {
+        fans.entry(name)
+            .and_modify(|merged| {
+                merged.full_speed_fallback |= reading.full_speed_fallback;
+                merged.celsius = merged.celsius.or(reading.celsius);
+            })
+            .or_insert(reading);
+    }
+    fans
 }
 
 fn base_of_port_suffix(device_id: &str) -> &str {
@@ -640,6 +700,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn aio_only_and_aio_lost_curves_reach_the_gui() {
+        let reading = |celsius, full_speed_fallback| CurveTemperature {
+            celsius,
+            full_speed_fallback,
+            source: None,
+        };
+        let fans = HashMap::from([("shared".to_string(), reading(Some(55.0), false))]);
+        let aio = HashMap::from([
+            ("shared".to_string(), reading(None, true)),
+            ("pump".to_string(), reading(Some(40.0), false)),
+        ]);
+        let merged = merge_curve_temperatures(fans, aio);
+        assert_eq!(merged["shared"], reading(Some(55.0), true));
+        assert_eq!(merged["pump"], reading(Some(40.0), false));
+    }
+
+    #[test]
     fn pump_telemetry_occupies_its_own_slot_even_without_fans() {
         assert_eq!(with_pump_rpm(vec![], 0, Some(2500)), vec![2500]);
         assert_eq!(
@@ -658,6 +735,43 @@ mod tests {
             .remove("pump_mb_sync_support");
         let decoded: DeviceInfo = serde_json::from_value(value).unwrap();
         assert!(!decoded.pump_mb_sync_support);
+    }
+
+    #[test]
+    fn h264_toggle_is_offered_only_on_h264_panels_under_one_key_per_port() {
+        let panel = |family, pid, topology: &str| DeviceInfo {
+            family,
+            pid,
+            has_lcd: true,
+            ..dev("panel", Some(topology))
+        };
+        let lcd = panel(DeviceFamily::UniversalScreen, 0xA088, "1cbe:a088:1-3.2");
+        let expected = Some(H264Setting {
+            key: "usb:1-3.2".into(),
+            jpeg_available: true,
+        });
+        assert_eq!(h264_setting(&lcd, |_, _| unreachable!()), expected);
+        let desktop = panel(
+            DeviceFamily::UniversalScreenDesktop,
+            0xAD21,
+            "1a86:ad21:1-3.2",
+        );
+        assert_eq!(h264_setting(&desktop, |_, _| Some(true)), expected);
+        assert_eq!(
+            h264_setting(&desktop, |key, pid| {
+                assert_eq!((key, pid), ("usb:1-3.2", 0xAD21));
+                Some(false)
+            })
+            .map(|setting| setting.jpeg_available),
+            Some(false)
+        );
+        assert_eq!(h264_setting(&desktop, |_, _| None), None);
+        let jpeg_only = panel(DeviceFamily::Lancool207, 0xA065, "1cbe:a065:1-4");
+        assert_eq!(h264_setting(&jpeg_only, |_, _| unreachable!()), None);
+        assert_eq!(
+            h264_setting(&dev("fan", Some("0cf2:a102:1-5")), |_, _| None),
+            None
+        );
     }
 
     fn dev(device_id: &str, topology_key: Option<&str>) -> DeviceInfo {
@@ -693,6 +807,7 @@ mod tests {
             port_index: None,
             wireless_group_mac: None,
             topology_key: topology_key.map(str::to_string),
+            h264: None,
         }
     }
 

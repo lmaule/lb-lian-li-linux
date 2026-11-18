@@ -29,7 +29,6 @@
   glib,
   libsoup_3,
   librsvg,
-  libayatana-appindicator,
   linuxPackages,
   systemd,
   runtimeShell,
@@ -86,7 +85,6 @@ rustPlatform.buildRustPackage {
     glib
     libsoup_3
     librsvg
-    libayatana-appindicator
   ];
 
   postPatch = ''
@@ -162,7 +160,6 @@ rustPlatform.buildRustPackage {
           libxkbcommon
           linuxPackages.evdi
           systemd
-          libayatana-appindicator
         ]
       } "$bin"
       addDriverRunpath "$bin"

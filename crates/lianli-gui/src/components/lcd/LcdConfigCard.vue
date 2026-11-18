@@ -17,6 +17,7 @@ import { useDeviceNamesStore } from "@/stores/deviceNames";
 import EditableName from "@/components/common/EditableName.vue";
 import { brightnessError } from "@/utils/brightnessControl";
 import { matchesMediaFile, pickMediaFile } from "@/utils/mediaPicker";
+import { h264Disabled } from "@/utils/h264";
 import SensorGaugeEditor from "@/components/lcd/SensorGaugeEditor.vue";
 import ColorPicker from "@/components/rgb/ColorPicker.vue";
 import OrientationPicker from "@/components/common/OrientationPicker.vue";
@@ -429,7 +430,8 @@ const templateOptions = computed(() =>
   config.templates.map((t) => ({ label: t.name, value: t.id })),
 );
 const deviceSupportsH264 = computed(() =>
-  screenSupportsH264(selectedDevice.value?.family ?? ("Ene6k77" as any)),
+  screenSupportsH264(selectedDevice.value?.family ?? ("Ene6k77" as any))
+    && !h264Disabled(config.config, selectedDevice.value),
 );
 const supportsCCommand = computed(() => selectedDevice.value?.supports_c_command ?? false);
 const aio512Default = computed(() =>
@@ -511,8 +513,8 @@ async function duplicateTemplate() {
   config.templates.push(copy);
   props.entry.template_id = newId;
   await lcd.setTemplates(config.templates);
-  await config.load();
   config.markDirty();
+  await config.load({ keepDraft: true });
   renderPreview();
 }
 
@@ -531,8 +533,8 @@ async function deleteTemplate() {
         if (e.template_id === id) e.template_id = null;
       }
       await lcd.setTemplates(config.templates);
-      await config.load();
       config.markDirty();
+      await config.load({ keepDraft: true });
       renderPreview();
     },
   });

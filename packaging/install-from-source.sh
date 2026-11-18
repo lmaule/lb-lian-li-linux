@@ -71,7 +71,7 @@ if [ "$install_deps" -eq 1 ]; then
     arch)
       packages=(git libusb ffmpeg fontconfig mesa libxkbcommon wayland libx11 libinput libdrm
         libjpeg-turbo clang cmake pkg-config nasm npm
-        webkit2gtk-4.1 gtk3 glib2 libsoup3 libayatana-appindicator librsvg)
+        webkit2gtk-4.1 gtk3 glib2 libsoup3 librsvg)
       [ "$have_cargo" -eq 1 ] || packages+=(rustup)
       sudo pacman -S --needed "${packages[@]}"
       ;;
@@ -81,7 +81,7 @@ if [ "$install_deps" -eq 1 ]; then
         libgl-dev libegl-dev clang cmake pkg-config ffmpeg nasm npm
         libavcodec-dev libavformat-dev libswscale-dev libavutil-dev libavfilter-dev
         libwebkit2gtk-4.1-dev libglib2.0-dev libgtk-3-dev libsoup-3.0-dev
-        libayatana-appindicator3-dev librsvg2-dev)
+        librsvg2-dev)
       [ "$have_cargo" -eq 1 ] || packages+=(rustup)
       sudo apt-get update
       sudo apt-get install "${packages[@]}"
@@ -92,7 +92,7 @@ if [ "$install_deps" -eq 1 ]; then
         mesa-libGL-devel mesa-libEGL-devel clang cmake pkg-config ffmpeg
         ffmpeg-devel nasm npm
         webkit2gtk4.1-devel gtk3-devel glib2-devel libsoup3-devel
-        libappindicator-gtk3-devel librsvg2-devel)
+        librsvg2-devel)
       [ "$have_cargo" -eq 1 ] || packages+=(rustup)
       sudo dnf install "${packages[@]}"
       ;;
